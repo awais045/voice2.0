@@ -36,3 +36,65 @@ class QueueLog(models.Model):
     class Meta:
             db_table = 'queue_log'
             managed = False
+
+class VirtualQueue(models.Model):
+    id = models.AutoField(primary_key=True)
+    client = models.CharField(max_length=50, null=True, blank=True)
+    queue = models.CharField(max_length=50, null=True, blank=True)
+    virtual_queue = models.CharField(max_length=50, null=True, blank=True)
+    active = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], null=True, blank=True)
+    short_name = models.CharField(max_length=20, null=True, blank=True)
+    client_id = models.IntegerField(null=True, blank=True)
+    client_campaign_id = models.IntegerField(null=True, blank=True)
+    ccm_campaign_id = models.IntegerField(null=True, blank=True)
+    virtual_queue_type = models.CharField(
+        max_length=8,
+        choices=[('inbound', 'Inbound'), ('outbound', 'Outbound')],
+        null=True,
+        blank=True
+    )
+
+    class Meta:
+            db_table = 'virtual_queues'
+            managed = False
+
+
+
+class VDN(models.Model):
+    dnis = models.CharField(max_length=255, null=True, blank=True)
+    ext = models.CharField(max_length=100, default='s')
+    context = models.CharField(max_length=200, default='main1')
+    context_priority = models.CharField(max_length=100, default='1')
+    active = models.CharField(max_length=15, choices=[('N', 'No'), ('Y', 'Yes')], default='Y')  
+    client_campaign_id = models.IntegerField(null=True, blank=True)
+    full_did = models.CharField(max_length=128, null=True, blank=True)
+    vendor_id = models.IntegerField(null=True, blank=True)
+    tfn = models.CharField(max_length=255, null=True, blank=True)
+    vendor_name = models.CharField(max_length=255, null=True, blank=True)
+    pri = models.CharField(max_length=255, null=True, blank=True)
+    did = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        db_table = 'vdn'
+
+class ccmCampaigns(models.Model):
+    campaign_id = models.AutoField(primary_key=True)
+    client = models.CharField(max_length=50, null=True, blank=True)
+    campaign = models.CharField(max_length=50, null=True, blank=True)
+    name = models.CharField(max_length=50, null=True, blank=True)
+    crm_table = models.CharField(max_length=50, null=True, blank=True)
+    virtual_queue = models.CharField(max_length=50, null=True, blank=True)
+    virtual_queue_name = models.CharField(max_length=50, null=True, blank=True)
+    active = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], null=True, blank=True)
+    type = models.CharField(max_length=20, choices=[('inbound','Inbound') ,('Manual' ,'Manual')], null=True, blank=True)
+    short_name = models.CharField(max_length=20, null=True, blank=True)
+    client_id = models.IntegerField(null=True, blank=True)
+    client_campaign_id = models.IntegerField(null=True, blank=True)
+
+     # Define the relationship
+    # vdn = models.ForeignKey(
+    #     VDN, on_delete=models.CASCADE, related_name='campaigns'
+    # )
+    class Meta:
+            db_table = 'ccm_campaigns'
+            managed = False

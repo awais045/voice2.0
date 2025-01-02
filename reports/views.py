@@ -1,6 +1,6 @@
 from rest_framework import generics, status ,viewsets
 from rest_framework.response import Response
-from .models import AgentLogins
+from .models import AgentLogins , VirtualQueue
 from .serializers import AgentLoginsSerializer ,QueueLogSerializer
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -12,88 +12,7 @@ import math
 from django.core.paginator import Paginator
 from django.conf import settings
 
-class RegisterIVRDropView(APIView):
-    def get(self, request):
-        start_date = request.GET.get('start_date') 
-        end_date = request.GET.get('end_date') 
-        page_number = int(request.GET.get('page_number', 1)) 
-        page_size = int(request.GET.get('page_size', 10))  
-        offset = (page_number - 1) * page_size
-
-        start_date = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
-        end_date = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
-
-        # Check if both dates are provided
-        if not start_date or not end_date:
-            return JsonResponse({"error": "Both start_date and end_date must be provided."}, status=400)
-
-        # Ensure start_date is less than end_date
-        if start_date >= end_date:
-            return JsonResponse({"error": "start_date must be earlier than end_date."}, status=400)
-
-        # Ensure the range is within 200 days
-        if (end_date - start_date).days > 200:
-            return JsonResponse({"error": "The date range cannot exceed 200 days."}, status=400)
-
-        if start_date and end_date:
-            start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())
-            end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
-            with connection.cursor() as cursor:
-
-                # Fetch the total count
-                cursor.execute("""
-                    SELECT COUNT(*) as total_count
-                    FROM queue_log 
-                    WHERE time_id BETWEEN %s and %s
-                        AND event = 'IVRDROP'
-                """, [
-                    start_timestamp, end_timestamp 
-                ])
-                total_records = cursor.fetchone()[0]
-                # Calculate total pages and the current offset
-                total_pages = math.ceil(total_records / page_size)
-                offset = (page_number - 1) * page_size
-                ## end count
-
-                ## get VQ for campaigns
-
-                ## end get VQ 
-
-
-                ## get all counts 
-                cursor.execute("""
-                        SELECT queue_log.*
-                        FROM queue_log WHERE  
-                        time_id BETWEEN %s and %s  
-                        AND event = 'IVRDROP'
-                        LIMIT %s OFFSET %s
-                    """, [start_timestamp, end_timestamp ,
-                            page_size, offset])
-                rows = cursor.fetchall()
-    
-                columns = [col[0] for col in cursor.description]
-                data = [dict(zip(columns, row)) for row in rows]
-                # Close the connection
-                cursor.close()
-                connection.close()
-                serializer = QueueLogSerializer(data, many=True)
-                return Response({
-                                    "message":"Listing for IVR DROP.",
-                                    "pagination": {
-                                        "current_page": page_number,
-                                        "page_size": page_size,
-                                        "total_pages": total_pages,
-                                        "total_records": total_records,
-                                        "has_next": page_number < total_pages,
-                                        "has_previous": page_number > 1
-                                    },
-                                    "data":serializer.data,
-                                }, status=200)
-        else:
-            return Response({"error": "Start and end dates are required"}, status=400)
-
-
-# Create your views here.
+# Create your views here. 
 class RegisterAgentLoginsView(viewsets.ReadOnlyModelViewSet):
     queryset = AgentLogins.objects.all()
     serializer_class = AgentLoginsSerializer

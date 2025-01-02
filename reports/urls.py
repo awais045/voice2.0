@@ -1,6 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RegisterAgentLoginsView , AgentLoginsView ,RegisterIVRDropView
+from .views import RegisterAgentLoginsView , AgentLoginsView 
+from .ivr_drop import RegisterIVRDropView
+from .unanswered_calls_report import UnAnsweredCallsView ,UnAnsweredCallsGraphView
 
 router = DefaultRouter()
 router.register(r'agent_login', RegisterAgentLoginsView, basename='agent_login')
@@ -10,4 +12,7 @@ urlpatterns = [
     path('agent_logins/', AgentLoginsView.as_view(), name='agent_logins'),
     path('agent_login_logout/', AgentLoginsView.as_view(), name='agent_logins'),
     path('ivrdrop_report/', RegisterIVRDropView.as_view(), name='ivrdrop_report'),
+    path('unanswered_calls_report/', UnAnsweredCallsView.as_view(), name='unanswered_calls_report'),
+    path('unanswered_calls_report/graph/', UnAnsweredCallsGraphView.as_view(), name='unanswered_calls_report_graph'), # new url for graph
+
 ]
