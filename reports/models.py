@@ -59,7 +59,6 @@ class VirtualQueue(models.Model):
             managed = False
 
 
-
 class VDN(models.Model):
     dnis = models.CharField(max_length=255, null=True, blank=True)
     ext = models.CharField(max_length=100, default='s')
@@ -98,3 +97,57 @@ class ccmCampaigns(models.Model):
     class Meta:
             db_table = 'ccm_campaigns'
             managed = False
+
+class ManualCallsRecording(models.Model):
+    
+    recording_id = models.AutoField(primary_key=True)
+    channel = models.CharField(max_length=100, null=True, blank=True)
+    server_ip = models.GenericIPAddressField(protocol='IPv4', null=True, blank=True)
+    extension = models.CharField(max_length=100, null=True, blank=True)
+    start_time = models.DateTimeField(null=True, blank=True)
+    start_epoch = models.IntegerField(null=True, blank=True)
+    end_time = models.DateTimeField(null=True, blank=True)
+    end_epoch = models.IntegerField(null=True, blank=True)
+    length_in_sec = models.IntegerField(default=0)
+    duration = models.IntegerField(default=0)
+    length_in_min = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    filename = models.CharField(max_length=255, null=True, blank=True)
+    location = models.CharField(max_length=255, null=True, blank=True)
+    lead_id = models.PositiveIntegerField(null=True, blank=True)
+    manual_id = models.CharField(max_length=200, null=True, blank=True)
+    user = models.CharField(max_length=20, null=True, blank=True)
+    hangup_cause = models.CharField(max_length=100, null=True, blank=True)
+    dial_status = models.CharField(max_length=20, null=True, blank=True)
+    campaign_name = models.CharField(max_length=255, null=True, blank=True)
+    unique_id = models.CharField(max_length=255, null=True, blank=True)
+    vendor = models.CharField(max_length=30, null=True, blank=True)
+    disconnected_by = models.CharField(
+        max_length=10,
+        choices=[
+            ('Callee', 'Callee'),
+            ('Unknown', 'Unknown'),
+            ('Caller', 'Caller'),
+            ('Agent', 'Agent'),
+        ],
+        default='Unknown',
+    )
+    enable_for_client = models.BooleanField(default=False)
+    rating = models.IntegerField(null=True, blank=True)
+    evaluation_id = models.IntegerField(null=True, blank=True)
+    evaluated_by = models.IntegerField(null=True, blank=True)
+    evaluation_time = models.IntegerField(null=True, blank=True)
+    is_evaluated = models.BooleanField(null=True, blank=True)
+    comments = models.TextField(null=True, blank=True)
+    transcript = models.TextField(null=True, blank=True)
+    transcript_api = models.CharField(
+        max_length=10,
+        choices=[
+            ('deepgram', 'Deepgram'),
+            ('assembly', 'Assembly'),
+        ],
+        default='deepgram',
+    )
+
+    class Meta:
+        db_table = 'manual_recording_log'
+
