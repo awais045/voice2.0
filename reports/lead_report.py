@@ -15,17 +15,18 @@ from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func
 import json
 from django.db.models.functions import  Ceil
 from collections import defaultdict
+from django.db import connections
+from django.db.utils import ConnectionHandler
 
-# http://127.0.0.1:8000/api/leads_report/?start_date=2024-08-01&end_date=2025-01-02&format=json&clients=Zitro-LLC&dial_status=Not%20Connected
-
+# http://127.0.0.1:8000/api/leads_report/?start_date=2024-09-01&end_date=2025-01-09&format=json&clients=Zitro-LLC&queue=IA-English&page_size=22&report_type=upload
+# dialing/upload
 class LeadsReportView(APIView):
     def get(self, request):
         start_date = request.GET.get('start_date') 
         end_date = request.GET.get('end_date') 
-        dial_status = request.GET.get('dial_status') 
+        report_type = request.GET.get('report_type') 
         page_number = int(request.GET.get('page_number', 1)) 
         page_size = int(request.GET.get('page_size', 10))  
-        offset = (page_number - 1) * page_size
 
         start_date = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
         end_date = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
@@ -53,7 +54,8 @@ class LeadsReportView(APIView):
         formFieldsArray = getCampaignFields(form_name)
         formFieldsArray = json.loads(formFieldsArray.content)
 
-        print(formFieldsArray['select_fields'])
+        selectedFields = formFieldsArray['select_fields']
+
         # Ensure the range is within 200 days
         if (end_date - start_date).days > 200:
             return JsonResponse({"error": "The date range cannot exceed 200 days."}, status=400)
@@ -62,19 +64,50 @@ class LeadsReportView(APIView):
             start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())
             end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
 
+            """
+            Fetch leads from a dynamic database using the same query logic.
 
+            :param new_database_name: The name of the database to connect dynamically.
+            :param start_timestamp: Start timestamp for filtering.
+            :param end_timestamp: End timestamp for filtering.
+            :param data: Data containing the 'skills' for filtering.
+            :param page_size: Number of items per page.
+            :param page_number: Current page number.
+            :return: List of results for the current page.
+            """
+            new_database_name = data['new_database_name']
+            # Get the default database connection settings
+            current_db_settings = connections.databases['default'].copy()
+            # Update the NAME (database name) to the dynamic one
+            current_db_settings['NAME'] = new_database_name
+
+            # Add a new connection with a unique alias
+            alias = f'dynamic_{new_database_name}'
+            connections.databases[alias] = current_db_settings
             # Filter and annotate the query
-            queryset = LeadIn.objects.filter(
-                time_id__range=(start_timestamp, end_timestamp),
-                queue__in=data['skills']
-            ).order_by('time_id')
+            # queryset = LeadIn.objects.using(alias).filter(
+            #     time_id__range=(start_timestamp, end_timestamp),
+            #     queue__in=data['skills']
+            # ).order_by('time_id')
+            queryset = LeadIn.objects.using(alias)
+            if report_type == 'upload':
+                queryset = queryset.filter(
+                    time_id__range=(start_timestamp, end_timestamp),
+                    queue__in=data['skills']
+                ).order_by('time_id')
+            elif report_type == 'dialing':
+                queryset = queryset.filter(
+                    modify_time__range=(start_timestamp, end_timestamp),  # Use modify_time
+                    queue__in=data['skills']
+                ).order_by('modify_time')  # Order by modify_time
 
-            paginator = Paginator(queryset, page_size)  # `page_size` is the number of items per page
-            page_obj = paginator.get_page(page_number)  # `page_number` is the current page number
-            # Results for the current page
-            results = list(page_obj)
+            paginator = Paginator(queryset, page_size)
+            page_obj = paginator.get_page(page_number)
 
-            # Pagination details
+            # *** Apply values() to the page_obj.object_list ***
+            results = list(page_obj.object_list.values(*selectedFields))
+
+            # Pagination details (this remains the same)
             pagination_info = {
                 'total_items': paginator.count,
                 'total_pages': paginator.num_pages,
@@ -94,26 +127,31 @@ class LeadsReportView(APIView):
 def getCampaignFields(formName):
 
     formFields = { 'lead_id' : 'Lead ID', 
-                'time_id' : 'Entry Date',
-                 'modify_time' : 'Modify Time', 
-                 'agent' : 'User Extension',
-                 'ccm_agent_full_name' : 'User Name', 
-                 'status' : 'Status', 
-                 'cli' : 'Phone Number', 
-                 'queue' : 'Queue', 
-                 'call_type' : 'Call Type', 
-                 'manual_being_dialed' : 'Manual Dialed', 
-                 'duration' : 'Duration (Secs)',
-                 'manual_call_duration' : 'Manual Duration (Secs)',
-                 'selected_option' : 'Selected Option' ,
-                 'disconnection_cause' : 'Disconnection Cause'}
+                    'time_id' : 'Entry Date',
+                    'modify_time' : 'Modify Time', 
+                    'agent' : 'User Extension',
+                    'status' : 'Status', 
+                    'call_id' : 'Call ID', 
+                    'cli' : 'Phone Number', 
+                    'queue' : 'Queue', 
+                    'call_type' : 'Call Type', 
+                    'manual_being_dialed' : 'Manual Dialed', 
+                    'duration' : 'Duration (Secs)',
+                    'manual_call_duration' : 'Manual Duration (Secs)',
+                    'selected_option' : 'Selected Option' ,
+                    'dial_attempts' : 'Dial Attempts' ,
+                    'disconnection_cause' : 'Disconnection Cause'}
 
     select_fields = list(formFields.keys())
 
     # Querying CcmCampaign and joining with Vdn model
     sql_lead_in = (
         CampaignField.objects
-        .filter(campaign_id__in=formName)
+        .filter(
+            campaign_id__in=formName,
+            add_in_report='Y',
+            active='Y'
+            )
         .values( 'q_field','question','priority','field_report','type')
         .distinct()
     )
@@ -128,6 +166,9 @@ def getCampaignFields(formName):
     }
     return JsonResponse(response)
 
+
+def add_dynamic_connection(alias, config):
+    connections.databases[alias] = config
 
 def get_campaigns(request):
     # Convert query results into an array
@@ -150,6 +191,12 @@ def get_campaigns(request):
         data['skills'].append(row['name'])
         data['form_name'].append(row['form_name'])
 
+    parts = data['crm_table'][0].split('.')
+    try:
+        new_database_name = parts[0]
+        print(f"First part of: {new_database_name}")
+    except IndexError:
+        new_database_name = 'zitro'
     # Prepare the response
     response = {
         'skills': data['skills'],
@@ -157,7 +204,8 @@ def get_campaigns(request):
         'client_campaigns_ids': data['client_campaigns_ids'],
         'dnis': [],
         'crm_table': data['crm_table'],
-        'form_name': data['form_name']
+        'form_name': data['form_name'],
+        'new_database_name': new_database_name
     }
     return JsonResponse(response)
  

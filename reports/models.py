@@ -286,6 +286,7 @@ class LeadIn(models.Model):
     )
     table_show = models.CharField(max_length=30, null=True, blank=True)
     selected_option = models.CharField(max_length=155, null=True, blank=True)
+    selected_fields = models.CharField(max_length=155, null=True, blank=True)
     agent_comments = models.TextField(null=True, blank=True)    
     class Meta:
         db_table = 'leads_in'
