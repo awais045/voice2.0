@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import AgentLogins,QueueLog , ManualCallsRecording
+from .models import AgentLogins,QueueLog , ManualCallsRecording ,AgentCallLog
 
 from django.db.models import F, Func, IntegerField, ExpressionWrapper, Q
 from django.db.models import TimeField
@@ -43,3 +43,8 @@ class ManualRecordingLogSerializer(serializers.ModelSerializer):
                     'evaluation_id', 'evaluated_by', 'evaluation_time', 'is_evaluated',
                     'comments', 'transcript', 'transcript_api', 'dateTime', 'ringing_time', 'totalPulses',
                 ]
+        
+class AgentCallLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AgentCallLog
+        fields = '__all__'  # Or specify fields explicitly for better control

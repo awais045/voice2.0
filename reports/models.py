@@ -426,3 +426,75 @@ class CampaignField(models.Model):
 
     class Meta:
         db_table = 'campaign_fields'
+
+class AgentCallLog(models.Model):
+    id = models.AutoField(primary_key=True)  # AutoField is more idiomatic in Django
+    lead_id = models.IntegerField(null=True, blank=True)
+    time_id = models.IntegerField()
+    modify_time = models.IntegerField(null=True, blank=True)
+    agent = models.CharField(max_length=15, null=True, blank=True)
+    call_id = models.CharField(max_length=30, null=True, blank=True)
+    cli = models.CharField(max_length=50, null=True, blank=True)
+    duration = models.IntegerField(default=0)
+    wrapup_sec = models.IntegerField(default=0)
+    wrapup_time = models.IntegerField(null=True, blank=True)
+    wait_sec = models.IntegerField(default=0)
+    hold_sec = models.IntegerField(default=0)
+    disconnection_cause = models.CharField(
+        max_length=15,  # Adjust length as needed
+        choices=[
+            ('COMPLETECALLER', 'COMPLETECALLER'),
+            ('DROP', 'DROP'),
+            ('TRANSFER', 'TRANSFER'),
+            ('COMPLETEAGENT', 'COMPLETEAGENT'),
+        ],
+        null=True, blank=True
+    )
+    disconnected_by = models.CharField(
+        max_length=6, # Adjust length as needed
+        choices=[
+            ('Agent', 'Agent'),
+            ('Caller', 'Caller'),
+        ],
+        default='Caller'
+    )
+    queue = models.CharField(max_length=50, null=True, blank=True)
+    selected_option = models.CharField(max_length=100, null=True, blank=True)
+    disposition = models.CharField(max_length=100, null=True, blank=True)
+    sub_dispositoin = models.CharField(max_length=100, null=True, blank=True)
+    cat1 = models.CharField(max_length=100, null=True, blank=True)
+    sub_cat1 = models.CharField(max_length=100, null=True, blank=True)
+    cat2 = models.CharField(max_length=100, null=True, blank=True)
+    sub_cat2 = models.CharField(max_length=100, null=True, blank=True)
+    cro_comments = models.TextField(null=True, blank=True)
+    rec_file_name = models.CharField(max_length=200, null=True, blank=True)
+    rec_file_path = models.CharField(max_length=200, null=True, blank=True)
+    call_type = models.CharField(
+        max_length=10, # Adjust length as needed
+        choices=[
+            ('INBOUND', 'INBOUND'),
+            ('MANUAL', 'MANUAL'),
+            ('AUTODIALER', 'AUTODIALER'),
+        ],
+        default='INBOUND'
+    )
+    manual_id = models.CharField(max_length=30, null=True, blank=True)
+    dial_status = models.CharField(max_length=40, null=True, blank=True)
+    server_ip = models.CharField(max_length=20, null=True, blank=True)
+    dnis = models.CharField(max_length=30, null=True, blank=True)
+    audio_file_path = models.CharField(max_length=255, null=True, blank=True)
+    video_file_path = models.CharField(max_length=255, null=True, blank=True)
+    enable_for_client = models.BooleanField(default=False) # Use BooleanField
+    transfer_count = models.SmallIntegerField(null=True, blank=True)
+    answer_time = models.IntegerField(null=True, blank=True)
+    ivr_at = models.IntegerField(default=0)
+    disconnected_at = models.IntegerField(default=0)
+    rating = models.IntegerField(null=True, blank=True)
+    evaluation_id = models.IntegerField(null=True, blank=True)
+    evaluated_by = models.IntegerField(null=True, blank=True)
+    evaluation_time = models.PositiveIntegerField(null=True, blank=True) # Use PositiveIntegerField
+    is_evaluated = models.BooleanField(default=False) # Use BooleanField
+    comments = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'agent_call_log' # Important to keep the original table name

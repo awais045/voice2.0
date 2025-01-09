@@ -5,6 +5,7 @@ from .ivr_drop import RegisterIVRDropView
 from .unanswered_calls_report import UnAnsweredCallsView ,UnAnsweredCallsGraphView 
 from .manual_calls_report import ManualCallsReportView
 from .lead_report import LeadsReportView
+from .call_recording_report import CallsRecordingsView
 router = DefaultRouter()
 router.register(r'agent_login', RegisterAgentLoginsView, basename='agent_login')
 
@@ -17,4 +18,5 @@ urlpatterns = [
     path('unanswered_calls_report/graph/', UnAnsweredCallsGraphView.as_view(), name='unanswered_calls_report_graph'), 
     path('manual_calls_report/', ManualCallsReportView.as_view(), name='manual_calls_report'), 
     path('leads_report/', LeadsReportView.as_view(), name='leads_report'), 
+    path('callcenter_recordings/', CallsRecordingsView.as_view(), name='callcenter_recordings'), 
 ]
