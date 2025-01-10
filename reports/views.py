@@ -36,10 +36,9 @@ class AgentLoginsView(APIView):
         if start_date >= end_date:
             return JsonResponse({"error": "start_date must be earlier than end_date."}, status=400)
 
-        # Ensure the range is within 90 days
-        if (end_date - start_date).days > 90:
-            return JsonResponse({"error": "The date range cannot exceed 90 days."}, status=400)
-
+        # Ensure the range is within 200 days
+        if (end_date - start_date).days > 200:
+            return JsonResponse({"error": "The date range cannot exceed 200 days."}, status=400)
 
         if start_date and end_date:
             start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())

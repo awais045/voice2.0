@@ -13,7 +13,7 @@ import json
 from collections import defaultdict
 from django.db import connections
 
-# http://127.0.0.1:8000/api/leads_report/?start_date=2024-09-01&end_date=2025-01-09&format=json&clients=Zitro-LLC&queue=IA-English&page_size=22&report_type=upload&lead_id=3
+#http://127.0.0.1:8000/api/leads_report/?start_date=2024-09-01&end_date=2025-01-09&format=json&clients=Zitro-LLC&queue=IA-English&page_size=22&report_type=upload&lead_id=3
 
 class LeadsReportView(APIView):
     def get(self, request):

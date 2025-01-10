@@ -1,19 +1,20 @@
 from rest_framework.response import Response
-from .models import ccmCampaigns ,CampaignField ,LeadIn ,VirtualQueue ,AgentCallLog
+from .models import ccmCampaigns ,CampaignField ,LeadIn ,VirtualQueue ,AgentCallLog,ManualCallsRecording
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from rest_framework.views import APIView
 from django.db import connection
 from datetime import datetime
 from django.core.paginator import Paginator , EmptyPage, PageNotAnInteger
-from django.db.models import TimeField , Func , Q
+from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func , ExpressionWrapper ,CharField ,Q
 import json
 from collections import defaultdict
 from django.db import connections
-from .serializers import AgentCallLogSerializer
+from .serializers import AgentCallLogSerializer,ManualRecordingLogSerializer
 
 #http://127.0.0.1:8000/api/callcenter_recordings/?start_date=2024-11-01&end_date=2025-01-10&format=json&clients=infoarc&queue=infoarc&call_type=INBOUND&cli=&disposition=&lead_id=&duration=
- 
+#http://127.0.0.1:8000/api/callcenter_recordings/?start_date=2024-08-01&end_date=2025-01-10&format=json&clients=infoarc&queue=infoarc&call_type=MANUAL&cli=&disposition=&lead_id=&duration=&agent=
+
 class CallsRecordingsView(APIView):
     def get(self, request):
         start_date = request.GET.get('start_date') 
@@ -47,7 +48,6 @@ class CallsRecordingsView(APIView):
         if call_type.upper() not in allowed_call_types: #case insensitive check
             return JsonResponse({'error': 'Invalid call_type. Allowed values are INBOUND and MANUAL.'}, status=400)
 
-
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
         data = json.loads(virtualQueues.content)
@@ -68,20 +68,67 @@ class CallsRecordingsView(APIView):
 
             if(call_type == 'MANUAL'):
                 # get form fields and mapping with data 
-                form_name = data['form_name']
-                formFieldsArray = getCampaignFields(form_name)
-                formFieldsArray = json.loads(formFieldsArray.content)
-                selectedFields = formFieldsArray['select_fields']
+                #form_name = data['form_name']
+                #formFieldsArray = getCampaignFields(form_name)
+                #formFieldsArray = json.loads(formFieldsArray.content)
+                #selectedFields = formFieldsArray['select_fields']
                 # Get the default database connection settings
-                new_database_name = data['new_database_name']
-                current_db_settings = connections.databases['default'].copy()
+                #new_database_name = data['new_database_name']
+                #current_db_settings = connections.databases['default'].copy()
                 # Update the NAME (database name) to the dynamic one
-                current_db_settings['NAME'] = new_database_name
+                #current_db_settings['NAME'] = new_database_name
                 # Add a new connection with a unique alias
-                alias = f'dynamic_{new_database_name}'
-                connections.databases[alias] = current_db_settings
+                #alias = f'dynamic_{new_database_name}'
+                #connections.databases[alias] = current_db_settings
+
+                # Filter and annotate the query
+                queryset = ManualCallsRecording.objects.filter(
+                    start_epoch__range=(start_timestamp, end_timestamp),
+                    campaign_name__in=data['skills'],
+                    length_in_sec__gt=duration
+                ).order_by('start_epoch').reverse().annotate(
+                    dateTime= F('start_epoch')  ,
+                    billSec=F('length_in_sec'),
+                    cliNum=F('extension'),
+                    sourceName=F('vendor'),
+                    agentExt=F('user'),
+                )
+
+                if lead_id:
+                    queryset = queryset.filter(lead_id=lead_id)
+
+                if cli:
+                    queryset = queryset.filter(extension=cli)
+
+                if disposition:
+                    queryset = queryset.filter(disposition=disposition)
+                
+                if agent:
+                    queryset = queryset.filter(Q(user__iexact=agent) | Q(user__icontains=agent))
+                
+                paginator = Paginator(queryset, page_size)  # `page_size` is the number of items per page
+                page_obj = paginator.get_page(page_number)  # `page_number` is the current page number
+                # Results for the current page
+                results = ManualRecordingLogSerializer(page_obj, many=True)
+                # Pagination details (this remains the same)
+                # Pagination details
+                pagination_info = {
+                    'total_items': paginator.count,
+                    'total_pages': paginator.num_pages,
+                    'current_page': page_obj.number,
+                    'has_next': page_obj.has_next(),
+                    'has_previous': page_obj.has_previous(),
+                }
+
+                return Response({
+                                    "message":"Manual Calls Report.",
+                                    "pagination": pagination_info,
+                                    "data": results.data,
+                                }, status=200)
 
 
+
+            ## INBOUND Call REcordings
             if(call_type == 'INBOUND'):
                 # Filter and annotate the query
                 queryset = AgentCallLog.objects.filter(
@@ -102,7 +149,6 @@ class CallsRecordingsView(APIView):
                 
                 if agent:
                     queryset = queryset.filter(Q(agent__iexact=agent) | Q(agent__icontains=agent))
-
 
                 paginator = Paginator(queryset, page_size)
                 page_obj = paginator.get_page(page_number)

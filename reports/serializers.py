@@ -41,8 +41,9 @@ class ManualRecordingLogSerializer(serializers.ModelSerializer):
                     'user', 'hangup_cause', 'dial_status', 'campaign_name', 'unique_id',
                     'vendor', 'disconnected_by', 'enable_for_client', 'rating',
                     'evaluation_id', 'evaluated_by', 'evaluation_time', 'is_evaluated',
-                    'comments', 'transcript', 'transcript_api', 'dateTime', 'ringing_time', 'totalPulses',
+                    'comments', 'transcript', 'transcript_api'
                 ]
+        #'dateTime',  'ringing_time', 'totalPulses','agentExt'
         
 class AgentCallLogSerializer(serializers.ModelSerializer):
     class Meta:

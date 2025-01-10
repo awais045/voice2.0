@@ -6,6 +6,8 @@ from .unanswered_calls_report import UnAnsweredCallsView ,UnAnsweredCallsGraphVi
 from .manual_calls_report import ManualCallsReportView
 from .lead_report import LeadsReportView
 from .call_recording_report import CallsRecordingsView
+from .call_recording_evaluation import CallsRecordingsEvaluationView
+
 router = DefaultRouter()
 router.register(r'agent_login', RegisterAgentLoginsView, basename='agent_login')
 
@@ -19,4 +21,6 @@ urlpatterns = [
     path('manual_calls_report/', ManualCallsReportView.as_view(), name='manual_calls_report'), 
     path('leads_report/', LeadsReportView.as_view(), name='leads_report'), 
     path('callcenter_recordings/', CallsRecordingsView.as_view(), name='callcenter_recordings'), 
+    path('callcenter_recordings_evaluation/', CallsRecordingsView.as_view(), name='callcenter_recordings_evaluation'), 
+    path('callcenterRecordingsEvaluationSave/', CallsRecordingsEvaluationView.as_view(), name='callcenterRecordingsEvaluationSave'),
 ]
