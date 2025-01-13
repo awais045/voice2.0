@@ -497,4 +497,24 @@ class AgentCallLog(models.Model):
     comments = models.TextField(null=True, blank=True)
 
     class Meta:
-        db_table = 'agent_call_log' # Important to keep the original table name
+        db_table = 'agent_call_log'  
+
+class LeadEvaluation(models.Model):
+    id = models.AutoField(primary_key=True)   
+    channel = models.CharField(max_length=20, null=True)
+    lead_id = models.IntegerField(null=True)
+    reference_id = models.IntegerField(null=True)
+    direction = models.CharField(max_length=20, null=True)
+    contact = models.CharField(max_length=50, null=True)
+    client_id = models.IntegerField(null=True)
+    queue = models.CharField(max_length=50, null=True)
+    agent = models.CharField(max_length=15, null=True)
+    interaction_time = models.IntegerField(null=True)
+    duration = models.IntegerField(null=True)
+    rating = models.IntegerField(null=True)
+    comments = models.TextField(null=True)
+    evaluated_by = models.IntegerField(null=True)
+    evaluation_time = models.IntegerField(null=True)
+
+    class Meta:
+        db_table = 'lead_evaluations'

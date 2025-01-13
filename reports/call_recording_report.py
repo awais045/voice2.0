@@ -255,7 +255,7 @@ def get_campaigns(request):
         print(f"First part of: {new_database_name}")
     except IndexError:
         new_database_name = 'zitro'
-    # Prepare the response
+    # Prepare the response 
     response = {
         'skills': data['skills'],
         'client_id': data['client_ids'],
