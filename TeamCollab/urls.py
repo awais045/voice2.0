@@ -11,7 +11,7 @@ schema_view = get_schema_view(
         default_version='v1',
         description="Reports for voice ",
         terms_of_service="https://www.example.com/terms/",
-        contact=openapi.Contact(email="contact@example.com"),
+        contact=openapi.Contact(email="awaiszulifqar52@gmail.com"),
         license=openapi.License(name="Awesome License"),
     ),
     public=True,
