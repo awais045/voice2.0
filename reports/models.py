@@ -518,3 +518,18 @@ class LeadEvaluation(models.Model):
 
     class Meta:
         db_table = 'lead_evaluations'
+
+class AgentLogOutbound(models.Model):
+    time_id = models.IntegerField()
+    lead_id = models.IntegerField(null=True)
+    user = models.CharField(max_length=30, null=True)
+    status = models.CharField(max_length=100, null=True)
+    sub_disposition = models.CharField(max_length=100, null=True)
+    comments = models.TextField(null=True)
+    manual_id = models.CharField(max_length=25, null=True)
+    campaign = models.CharField(max_length=50, null=True)
+    time_spent = models.IntegerField(default=0)
+    id = models.AutoField(primary_key=True) 
+
+    class Meta:
+        db_table = 'agent_log_outbound'

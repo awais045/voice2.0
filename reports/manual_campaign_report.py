@@ -1,32 +1,22 @@
 from rest_framework.response import Response
-from .models import ccmCampaigns ,CampaignField ,LeadIn ,VirtualQueue ,AgentCallLog,ManualCallsRecording,AgentLogins
+from .models import ccmCampaigns ,CampaignField  ,VirtualQueue ,ManualCallsRecording,AgentLogins , AgentLogOutbound
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from rest_framework.views import APIView
-from django.db import connection
-from datetime import datetime ,timedelta
-from django.core.paginator import Paginator , EmptyPage, PageNotAnInteger
-from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func , ExpressionWrapper ,CharField ,Q,Value
+from datetime import datetime 
+from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func  ,CharField ,Q,Value,Count
 import json
 from collections import defaultdict
 from django.db import connections
-from .serializers import AgentCallLogSerializer,ManualRecordingLogSerializer
+from django.db.models.functions import Length
 
-#http://127.0.0.1:8000/api/callcenter_recordings/?start_date=2024-11-01&end_date=2025-01-10&format=json&clients=infoarc&queue=infoarc&call_type=INBOUND&cli=&disposition=&lead_id=&duration=
+#http://127.0.0.1:8000/api/manual_campaign_report/?start_date=2024-11-01&end_date=2025-01-10&format=json&clients=infoarc&queue=infoarc&call_type=INBOUND&cli=&disposition=&lead_id=&duration=
 
 class ManualCampaignReportView(APIView):
     def get(self, request):
         start_date = request.GET.get('start_date') 
         end_date = request.GET.get('end_date') 
-        disposition = request.GET.get('disposition') 
-
-        duration = get_int_from_request(request, 'duration')
-        lead_id = get_int_from_request(request, 'lead_id')
-        agent = get_int_from_request(request, 'agent')
-        cli = get_int_from_request(request, 'cli')
-
-        page_number = int(request.GET.get('page_number', 1)) 
-        page_size = int(request.GET.get('page_size', 10))  
+        groupOndate = get_int_from_request(request, 'groupOndate')
 
         start_date = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
         end_date = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
@@ -38,14 +28,6 @@ class ManualCampaignReportView(APIView):
         # Ensure start_date is less than end_date
         if start_date >= end_date:
             return JsonResponse({"error": "start_date must be earlier than end_date."}, status=400)
-
-        call_type = request.GET.get('call_type') 
-        allowed_call_types = ['INBOUND', 'MANUAL']
-        if not call_type:  # Check if call_type is empty (None or "")
-            return JsonResponse({'error': 'call_type parameter is required.'}, status=400)
-
-        if call_type.upper() not in allowed_call_types: #case insensitive check
-            return JsonResponse({'error': 'Invalid call_type. Allowed values are INBOUND and MANUAL.'}, status=400)
 
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
@@ -65,21 +47,187 @@ class ManualCampaignReportView(APIView):
             start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())
             end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
 
-            agentLogins = getAgentLogins(start_timestamp , end_timestamp ,data['skills'] ,'campaign',1)
-            print(agentLogins)
-             
+            resultData = outboundCampaignSummary(start_timestamp , end_timestamp ,data['skills'] ,groupOndate )
+            dataResult = json.loads(resultData.content)
 
-
-
+            response = {
+                'message':"Manual Campaign Summary Report",
+                'data': dataResult,
+            }
+            return JsonResponse(response)
         else:
             return Response({"error": "Start and end dates are required"}, status=400)
 
 
+def outboundCampaignSummary(startDate , endDate ,skills ,groupOnDate =0 ):
 
-def outboundCampaignSummary(startDate , endDate ,skills ):
+    queryset = (
+            ManualCallsRecording.objects
+            .annotate(
+                day_value=Func(F('start_epoch'),Value('%Y-%m-%d'),function='FROM_UNIXTIME',output_field=CharField()),
+                user_length=Length('user'),
+                duration_diff=F('end_epoch') - F('start_epoch')
+            )
+            .filter(
+                start_epoch__range=(startDate, endDate),
+                campaign_name__in=skills,
+                user_length__lt=7
+            )
+            .values('day_value', 'user')
+            .annotate(
+                lead_no=Count('manual_id', distinct=True),
+                manual_count=Count('manual_id'),
+                #call_process_time=Sum('length_in_sec'),
+                total_time=Sum('length_in_sec'),
+                answer_count=Sum(Case(When(length_in_sec__gt=0, then=Value(1)),default=Value(0),output_field=IntegerField())),
+                call_process_time=Sum(
+                            Case(
+                                When(
+                                    end_epoch__gt=0,
+                                    then=Case(
+                                        When(
+                                            duration_diff__gt=3600,  # Use the 'duration_diff' annotation
+                                            then=Value(1000, output_field=IntegerField())
+                                        ),
+                                        default=F('end_epoch') - F('start_epoch')  # Use the 'duration' annotation
+                                    )
+                                ),
+                                default=Value(0, output_field=IntegerField())
+                            )
+                        )
+            )
+            .values(
+                'day_value', 'user', 'lead_no', 'manual_count', 'total_time', 'answer_count', 'call_process_time')
+        )
+
+    agent = {}
+    for resAgent in queryset:
+        # Calculate CALL_PROCESS_TIME if needed
+        if resAgent['call_process_time'] < resAgent['total_time']:
+            resAgent['call_process_time'] = resAgent['total_time'] + 1000
+
+        totalRingtime = resAgent['call_process_time'] - resAgent['total_time']
+
+        # Conditional processing based on groupOnDate
+        if groupOnDate:
+            day_value = resAgent['day_value']
+            user = resAgent['user']
+
+            if day_value not in agent:
+                agent[day_value] = {}
+
+            if user not in agent[day_value]:
+                agent[day_value][user] = {}
+
+            agent[day_value][user]["LEAD_NO"] = resAgent['lead_no']
+            agent[day_value][user]["MANUAL"] = resAgent['manual_count']
+            agent[day_value][user]["CALL_PROCESS_TIME"] = resAgent['call_process_time']
+            agent[day_value][user]["TTIME"] = resAgent['total_time']
+            agent[day_value][user]["ANSWER"] = resAgent['answer_count']
+            agent[day_value][user]["totalRingtime"] = totalRingtime
+            agent[day_value][user]["THT"] = 0
+            agent[day_value][user]["bcwAcw"] = 0
+
+        else:
+            user = resAgent['user']
+
+            if user not in agent:
+                agent[user] = {}
+
+            agent[user]["LEAD_NO"] = resAgent['lead_no']
+            agent[user]["MANUAL"] = resAgent['manual_count']
+            agent[user]["CALL_PROCESS_TIME"] = resAgent['call_process_time']
+            agent[user]["TTIME"] = resAgent['total_time']
+            agent[user]["ANSWER"] = resAgent['answer_count']
+            agent[user]["totalRingtime"] = totalRingtime
+            agent[user]["THT"] = 0
+            agent[user]["bcwAcw"] = 0
 
 
+    agentLogOutboundJson = agentLogOutBound(startDate , endDate ,skills ,groupOnDate)
+    agentLogOutboundRows = json.loads(agentLogOutboundJson.content)
 
+
+    if agentLogOutboundRows['agentData']:
+        if groupOnDate:
+            for date_key_val, user_detail in agentLogOutboundRows['agentData'].items():
+                if date_key_val not in agent:
+                    continue  
+
+                for user, val_user in user_detail.items():
+                    for m, val in val_user.items():
+                        
+                        tht_value = agent[date_key_val][user].get('THT', 0) 
+
+                        if val.get('UNLOCKED') and val.get('LOCKED'):
+                            agent[date_key_val][user]['THT'] =tht_value+ val['UNLOCKED'] - val['LOCKED']
+                        else:
+                            agent[date_key_val][user]['THT'] = tht_value+15
+                        
+                        # print(agent[date_key_val][user].get('CALL_PROCESS_TIME', 0))
+                        agent[date_key_val][user]['bcwAcw'] = max(agent[date_key_val][user].get('THT', 0) - agent[date_key_val][user].get('CALL_PROCESS_TIME', 0), 0)
+        else:
+            for user, val_user in agentLogOutboundRows['agentData'].items():
+                if user not in agent:
+                    continue  
+
+                for m, val in val_user.items():
+                    tht_value = agent[user].get('THT', 0) 
+                    if val.get('UNLOCKED') and val.get('LOCKED'):
+                        agent[user]['THT'] = tht_value+val['UNLOCKED'] - val['LOCKED']
+                    else:
+                        agent[user]['THT'] = tht_value+15
+
+                    agent[user]['bcwAcw'] = max(agent[user].get('THT', 0) - agent[user].get('CALL_PROCESS_TIME', 0),  0)
+
+    response = {
+        'agent': agent,
+    }
+    return JsonResponse(response)
+
+
+def agentLogOutBound(startDate , endDate ,skills ,groupOnDate):
+    queryset = AgentLogOutbound.objects.filter(
+                time_id__range=(startDate, endDate),
+                campaign__in=skills,
+                status__in=['LOCKED', 'UNLOCKED']
+            ).exclude(user='').annotate(
+                day_value=Func(F('time_id'),Value('%Y-%m-%d'),function='FROM_UNIXTIME',output_field=CharField()),
+                # manual_id= F('lead_id')  ,
+            ).values('day_value','time_id','user','status','lead_id')
+    
+    agentData = {}
+    for resAgent in queryset:
+        # Conditional processing based on groupOnDate
+        if groupOnDate:
+            day_value = resAgent['day_value']
+            user = resAgent['user']
+
+            if day_value not in agentData:
+                agentData[day_value] = {}
+
+            if user not in agentData[day_value]:
+                agentData[day_value][user] = {}
+
+            if resAgent['lead_id'] not in agentData[day_value][user]:
+                agentData[day_value][user][resAgent['lead_id']] = {}
+        
+            agentData[day_value][user][resAgent['lead_id']][resAgent['status']] = resAgent['time_id']
+        else:
+            user = resAgent['user']
+
+            if user not in agentData:
+                agentData[user] = {}
+
+            if resAgent['lead_id'] not in agentData[user]:
+                agentData[user][resAgent['lead_id']] = {}
+
+            agentData[user][resAgent['lead_id']][resAgent['status']] = resAgent['time_id']
+
+    response = {
+        'agentData': agentData
+    }
+    return JsonResponse(response)
 
 def getAgentLogins(startDate,endDate,skills,groupBy,groupOnDate):
     
@@ -113,7 +261,6 @@ def getAgentLogins(startDate,endDate,skills,groupBy,groupOnDate):
         .values('id','time_id', 'extension', 'calc_starttime', 'calc_endtime','queue')
         .order_by('extension')
     )
-    print(logins)
     # Required mappings and placeholders (replace these appropriately)
     agent_names = {}  # Map extension to agent names
     queue_mapping = {}  # Map dbQueue to virtual queues
@@ -308,3 +455,5 @@ class TimeDiff(Func):
     arity = 1
     output_field = TimeField()
 
+# def FROM_UNIXTIME(timestamp):
+#     return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
