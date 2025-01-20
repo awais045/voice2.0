@@ -9,6 +9,7 @@ from .call_recording_report import CallsRecordingsView
 from .call_recording_evaluation import CallsRecordingsEvaluationView
 from .manual_campaign_report import ManualCampaignReportView
 from .campaign_summary_report import CampaignSummaryReportView
+from .client_campaigns import ClientCampaignView
 
 router = DefaultRouter()
 router.register(r'agent_login', RegisterAgentLoginsView, basename='agent_login')
@@ -27,4 +28,5 @@ urlpatterns = [
     path('callcenterRecordingsEvaluationSave/', CallsRecordingsEvaluationView.as_view(), name='callcenterRecordingsEvaluationSave'),
     path('manual_campaign_report/', ManualCampaignReportView.as_view(), name='manual_campaign_report'),
     path('campaign_summary_report/', CampaignSummaryReportView.as_view(), name='campaign_summary_report'),
+    path('client_campaigns/', ClientCampaignView.as_view(), name='client_campaigns'),
 ]

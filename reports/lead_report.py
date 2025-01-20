@@ -138,7 +138,7 @@ def getCampaignFields(formName):
                     'duration' : 'Duration (Secs)',
                     'manual_call_duration' : 'Manual Duration (Secs)',
                     'selected_option' : 'Selected Option' ,
-                    'dial_attempts' : 'Dial Attempts' ,
+                    'attempts' : 'Dial Attempts' ,
                     'disconnection_cause' : 'Disconnection Cause'}
 
     select_fields = list(formFields.keys())
