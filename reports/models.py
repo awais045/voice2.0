@@ -533,3 +533,18 @@ class AgentLogOutbound(models.Model):
 
     class Meta:
         db_table = 'agent_log_outbound'
+
+class AgentBreak(models.Model):
+    id = models.AutoField(primary_key=True)
+    extension = models.IntegerField(blank=True, null=True)
+    fullName = models.CharField(max_length=100, blank=True, null=True)
+    queue = models.CharField(max_length=50, blank=True, null=True)
+    startTime = models.IntegerField(blank=True, null=True)
+    endTime = models.IntegerField(blank=True, null=True)
+    breakCode = models.CharField(max_length=30, blank=True, null=True)
+    server_ip = models.CharField(max_length=20, blank=True, null=True)
+    time_id = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = 'agentbreaks'

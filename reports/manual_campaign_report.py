@@ -95,9 +95,7 @@ def outboundCampaignSummary(startDate , endDate ,skills ,groupOnDate =0 ):
                                 default=Value(0, output_field=IntegerField())
                             )
                         )
-            )
-            .values(
-                'day_value', 'user', 'lead_no', 'manual_count', 'total_time', 'answer_count', 'call_process_time')
+            ).values( 'day_value', 'user', 'lead_no', 'manual_count', 'total_time', 'answer_count', 'call_process_time')
         )
 
     agent = {}
