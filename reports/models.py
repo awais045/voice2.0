@@ -17,7 +17,7 @@ class AgentLogins(models.Model):
             managed = False
 
 class QueueLog(models.Model):
-    rowcount = models.IntegerField()
+    rowcount = models.AutoField(primary_key=True)
     time_id = models.IntegerField()
     call_id = models.CharField(max_length=100)
     queue = models.CharField(max_length=50)    
