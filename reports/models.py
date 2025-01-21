@@ -13,7 +13,7 @@ class AgentLogins(models.Model):
     agent_ip = models.CharField(max_length=100)
 
     class Meta:
-            db_table = 'agentlogins'
+            db_table = 'agentLogins'
             managed = False
 
 class QueueLog(models.Model):
@@ -518,3 +518,33 @@ class LeadEvaluation(models.Model):
 
     class Meta:
         db_table = 'lead_evaluations'
+
+class AgentLogOutbound(models.Model):
+    time_id = models.IntegerField()
+    lead_id = models.IntegerField(null=True)
+    user = models.CharField(max_length=30, null=True)
+    status = models.CharField(max_length=100, null=True)
+    sub_disposition = models.CharField(max_length=100, null=True)
+    comments = models.TextField(null=True)
+    manual_id = models.CharField(max_length=25, null=True)
+    campaign = models.CharField(max_length=50, null=True)
+    time_spent = models.IntegerField(default=0)
+    id = models.AutoField(primary_key=True) 
+
+    class Meta:
+        db_table = 'agent_log_outbound'
+
+class AgentBreak(models.Model):
+    id = models.AutoField(primary_key=True)
+    extension = models.IntegerField(blank=True, null=True)
+    fullName = models.CharField(max_length=100, blank=True, null=True)
+    queue = models.CharField(max_length=50, blank=True, null=True)
+    startTime = models.IntegerField(blank=True, null=True)
+    endTime = models.IntegerField(blank=True, null=True)
+    breakCode = models.CharField(max_length=30, blank=True, null=True)
+    server_ip = models.CharField(max_length=20, blank=True, null=True)
+    time_id = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = 'agentBreaks'

@@ -96,12 +96,20 @@ WSGI_APPLICATION = 'TeamCollab.wsgi.application'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.mysql',
+    #     'NAME': 'ccm',
+    #     'USER': "crmUser",
+    #     'PASSWORD': 'iuoljugevnb98juy72k',
+    #     'HOST': '10.30.11.228',
+    #     'PORT': '3306',
+    # }
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'ccm',
         'USER': "crmUser",
         'PASSWORD': 'iuoljugevnb98juy72k',
-        'HOST': '10.30.11.228',
+        'HOST': '3.17.47.183',
         'PORT': '3306',
     }
     # 'default': {
