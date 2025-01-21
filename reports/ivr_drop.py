@@ -36,11 +36,6 @@ class RegisterIVRDropView(APIView):
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
         data = json.loads(virtualQueues.content)
-        # print("\nAccessing data after response:")
-        # print(f"Campaigns: {data['campaigns']}")
-        # print(f"Client IDs: {data['client_id']}")
-        # print(f"Client Campaign IDs: {data['client_campaigns_ids']}")
-        # print(f"DNIS: {data['dnis']}")
         ## end get VQ 
         if not data['client_id'] or data['dnis'] is None: # Corrected condition
             return JsonResponse({'message': 'No records found'}, status=404) # Return error response with 404
@@ -59,7 +54,7 @@ class RegisterIVRDropView(APIView):
                     SELECT COUNT(*) as total_count
                     FROM queue_log 
                     WHERE time_id BETWEEN %s and %s
-                        AND event = 'IVRDROP' AND arg2 IN(%s) AND arg3 IN(%s)
+                        AND event = 'IVRDROP' AND arg2 IN(%s) AND arg3 IN %s
                 """, [
                     start_timestamp, end_timestamp  ,data['client_id'], data['dnis']
                 ])
@@ -74,7 +69,7 @@ class RegisterIVRDropView(APIView):
                         SELECT queue_log.*
                         FROM queue_log WHERE  
                         time_id BETWEEN %s and %s  
-                        AND event = 'IVRDROP' AND arg2 IN(%s) AND arg3 IN(%s)
+                        AND event = 'IVRDROP' AND arg2 IN(%s) AND arg3 IN %s
                         LIMIT %s OFFSET %s
                     """, [start_timestamp, end_timestamp , data['client_id'], data['dnis'],
                             page_size, offset])
