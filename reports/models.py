@@ -13,7 +13,7 @@ class AgentLogins(models.Model):
     agent_ip = models.CharField(max_length=100)
 
     class Meta:
-            db_table = 'agentlogins'
+            db_table = 'agentLogins'
             managed = False
 
 class QueueLog(models.Model):
@@ -547,4 +547,4 @@ class AgentBreak(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'agentbreaks'
+        db_table = 'agentBreaks'

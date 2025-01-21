@@ -153,7 +153,6 @@ class UnAnsweredCallsGraphView(APIView):
                     )
                     interval_start_end.append((interval_start, interval_end))
             
-            print(campaign)
             # Query the data
             queryset = QueueLog.objects.filter(
                 time_id__gte=start_timestamp,
@@ -196,7 +195,6 @@ def get_campaigns(request):
         client=request.GET.get('clients'),
         active='Y'
     )
-
     # Additional filter if 'queue' is provided and not 'all'
     queue = request.GET.get('queue', '')
     if queue != 'all' and queue != '':
