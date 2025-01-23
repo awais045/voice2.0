@@ -1,14 +1,14 @@
 from rest_framework.response import Response
-from .models import ccmCampaigns ,CampaignField  ,VirtualQueue ,ManualCallsRecording,AgentLogins , AgentLogOutbound,AgentBreak
+from .models import ccmCampaigns ,CampaignField  ,VirtualQueue ,ManualCallsRecording,AgentLogins , QueueLog,AgentBreak
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from rest_framework.views import APIView
 from datetime import datetime ,timedelta, date
-from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func  ,CharField ,Q,Value,Count,Min, Max
+from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func  ,CharField ,Q,Value,Count,Min, Max,ExpressionWrapper
 import json
 from collections import defaultdict
 from django.db import connections ,connection
-from django.db.models.functions import Length
+from django.db.models.functions import Length,Coalesce, Abs,Cast
 
 #http://127.0.0.1:8000/api/campaign_summary_report/?start_date=2024-11-11&end_date=2024-12-14&format=json&clients=infoarc&queue=infoarc&groupOndate=1&groupBy=campaign
 
@@ -48,19 +48,73 @@ class CampaignSummaryReportView(APIView):
             start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())
             end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
 
-            resultData = getAgentLogins(start_timestamp , end_timestamp ,data['skills'] ,groupBy,groupOndate )
+            resultData = getAgentLoginsAndBreaksData(start_timestamp , end_timestamp ,data['skills'] ,groupBy,groupOndate )
             dataResult = json.loads(resultData.content)
+            
+            callStatsJson = getCallStatResult(start_timestamp , end_timestamp ,data['skills'] ,groupBy,groupOndate )
+            callStatsResult = json.loads(callStatsJson.content)
 
             response = {
                 'message':"Campaign Summary Report",
+                'callStatsResult': callStatsResult,
                 'data': dataResult,
             }
             return JsonResponse(response)
         else:
             return Response({"error": "Start and end dates are required"}, status=400)
 
+def getCallStatResult(startDate,endDate,skills,group_by,group_on_date):
 
-def getAgentLogins(startDate,endDate,skills,group_by,group_on_date):
+     
+    queryset = (
+            QueueLog.objects
+            .annotate(
+                dte=Func(F('time_id'),Value('%Y-%m-%d'),function='FROM_UNIXTIME',output_field=CharField()),
+            ).filter(
+                time_id__range=(startDate, endDate),
+                event__in=['COMPLETECALLER', 'COMPLETEAGENT', 'TRANSFER' , 'NONVOICEEND'],
+            )
+            .filter(Q(arg2__gte=0))
+            .values('agent', 'queue', 'dte','time_id' )
+            .annotate(
+                calls1=Count('*'),
+                # talk_time= Sum(
+                #     Case(
+                #         When(
+                #             event='TRANSFER',
+                #             then=Case(
+                #                 When(F('time_id') - Abs(F('arg3')) < startDate, then=F('time_id') - startDate),
+                #                 default=Abs(F('arg3')),
+                #                 output_field=IntegerField(),
+                #             ),
+                #         ),
+                #         When(
+                #             ~Q(event='NONVOICEEND'),
+                #             then=Case(
+                #                 When(F('time_id') - Abs(F('arg2')) < startDate, then=F('time_id') - startDate),
+                #                 default=Abs(F('arg2')),
+                #                 output_field=IntegerField(),
+                #             ),
+                #         ),
+                #         default=Value(0),
+                #         output_field=IntegerField(),
+                #     )
+                # ),
+                inside=Sum(Case( When(event='TRANSFER', then=Value(1)),default=Value(0),output_field=CharField())),
+                hold=Sum(Case(When(event='HOLD', then=F('time_id')),default=Value(0))),
+                un_hold=Sum(Case(When(event='UNHOLD', then=F('time_id')),default=Value(0))),
+                non_voice=Sum(Case(When(event='NONVOICEEND', then=Value(1)),default=Value(0))),
+                calls=Sum(Case(When(event__in=['COMPLETECALLER', 'COMPLETEAGENT', 'TRANSFER'], then=Value(1)),default=Value(0)))
+            ).order_by('agent').values( 'hold','un_hold','non_voice','calls','calls1' ,'inside','dte' )
+        )
+    print(queryset.query)
+
+    response = {
+        'getCallStatResult': list(queryset.values()),
+    }
+    return JsonResponse(response)
+
+def getAgentLoginsAndBreaksData(startDate,endDate,skills,group_by,group_on_date):
     
     # Filter and annotate the query
     logins = AgentLogins.objects.filter(

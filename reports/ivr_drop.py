@@ -66,7 +66,7 @@ class RegisterIVRDropView(APIView):
 
                 ## get all counts 
                 cursor.execute("""
-                        SELECT queue_log.*
+                        SELECT queue_log.* ,date_format(from_unixtime(time_id), "%%Y-%%m-%%d %%H:%%i:%%s") as formatted_time_id
                         FROM queue_log WHERE  
                         time_id BETWEEN %s and %s  
                         AND event = 'IVRDROP' AND arg2 IN(%s) AND arg3 IN %s

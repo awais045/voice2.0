@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-$&t*h%l6o=w1u1&)7w1fy40&*)o6-3y_x(o1hsv5fqwjjk*%k%'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['10.30.11.228', 'testbed-voice.enteract.cloud','127.0.0.1']
 

@@ -6,11 +6,12 @@ from rest_framework.views import APIView
 from django.db import connection
 from datetime import datetime
 from django.core.paginator import Paginator , EmptyPage, PageNotAnInteger
-from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func , ExpressionWrapper ,CharField ,Q
+from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func , ExpressionWrapper ,CharField ,Q,Value,Count
 import json
 from collections import defaultdict
 from django.db import connections
 from .serializers import AgentCallLogSerializer,ManualRecordingLogSerializer
+from django.db.models.functions import Cast 
 
 #http://127.0.0.1:8000/api/callcenter_recordings/?start_date=2024-11-01&end_date=2025-01-10&format=json&clients=infoarc&queue=infoarc&call_type=INBOUND&cli=&disposition=&lead_id=&duration=
 #http://127.0.0.1:8000/api/callcenter_recordings/?start_date=2024-08-01&end_date=2025-01-10&format=json&clients=infoarc&queue=infoarc&call_type=MANUAL&cli=&disposition=&lead_id=&duration=&agent=
@@ -86,6 +87,9 @@ class CallsRecordingsView(APIView):
                     start_epoch__range=(start_timestamp, end_timestamp),
                     campaign_name__in=data['skills'],
                     length_in_sec__gt=duration
+                ).annotate(
+                    formatted_start_epoch=Cast(Func(F('start_epoch'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
+                    formatted_end_epoch=Cast(Func(F('end_epoch'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
                 ).order_by('start_epoch').reverse().annotate(
                     dateTime= F('start_epoch')  ,
                     billSec=F('length_in_sec'),
@@ -136,6 +140,11 @@ class CallsRecordingsView(APIView):
                     queue__in=data['skills'],
                     call_type=call_type,
                     duration__gt=duration
+                ).annotate(
+                    formatted_time_id=Cast(Func(F('time_id'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
+                    formatted_modify_time=Cast(Func(F('modify_time'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
+                    formatted_wrapup_time=Cast(Func(F('wrapup_time'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
+                    formatted_disconnected_at=Cast(Func(F('disconnected_at'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
                 ).order_by('time_id')
 
                 if lead_id:

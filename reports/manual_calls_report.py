@@ -11,9 +11,9 @@ from datetime import datetime
 import math
 from django.core.paginator import Paginator , EmptyPage, PageNotAnInteger
 from django.conf import settings
-from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func , ExpressionWrapper ,CharField ,Q
+from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func , ExpressionWrapper ,CharField ,Q,Value,Count
 import json
-from django.db.models.functions import  Ceil
+from django.db.models.functions import  Ceil,Cast
 
 # http://127.0.0.1:8000/api/manual_calls_report/?start_date=2024-08-01&end_date=2025-01-02&format=json&clients=Zitro-LLC&dial_status=Not%20Connected
 
@@ -59,6 +59,7 @@ class ManualCallsReportView(APIView):
                 start_epoch__range=(start_timestamp, end_timestamp),
                 campaign_name__in=data['campaigns']
             ).annotate(
+                formatted_dateTime=Cast(Func(F('start_epoch'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
                 dateTime= F('start_epoch')  ,
                 billSec=F('length_in_sec'),
                 cliNum=F('extension'),
@@ -90,6 +91,7 @@ class ManualCallsReportView(APIView):
             page_obj = paginator.get_page(page_number)  # `page_number` is the current page number
             # Results for the current page
             results = list(queryset.values(
+                        'formatted_dateTime',
                         'dateTime',
                         'billSec',
                         'cliNum',
@@ -99,7 +101,8 @@ class ManualCallsReportView(APIView):
                         'agentExt',
                         'disconnectedBy',
                         'ringing_time',
-                        'totalPulses'
+                        'totalPulses',
+                        'lead_id'
                     ))
 
             # Pagination details
@@ -114,7 +117,7 @@ class ManualCallsReportView(APIView):
             return Response({
                                 "message":"Manual Calls Report.",
                                 "pagination": pagination_info,
-                                 "data": results,
+                                "data": results,
                             }, status=200)
         else:
             return Response({"error": "Start and end dates are required"}, status=400)

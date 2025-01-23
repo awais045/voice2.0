@@ -67,6 +67,8 @@ class AgentLoginsView(APIView):
                         SELECT logins.*,
                             FROM_UNIXTIME(logins.starttime) as starttime,
                             FROM_UNIXTIME(logins.endtime) as endtime,
+                            date_format(from_unixtime(starttime), "%%Y-%%m-%%d %%H:%%i:%%s") as formatted_starttime,
+                            date_format(from_unixtime(endtime), "%%Y-%%m-%%d %%H:%%i:%%s") as formatted_endtime,
                             if(starttime < %s, %s, starttime) as calc_starttime,
                             if(endtime > %s, %s, endtime) as calc_endtime,
                             (logins.endtime - logins.starttime) as duration

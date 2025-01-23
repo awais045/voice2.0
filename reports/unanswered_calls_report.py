@@ -11,7 +11,7 @@ from datetime import datetime
 import math
 from django.core.paginator import Paginator
 from django.conf import settings
-from django.db.models import F ,Sum, IntegerField, Case, When
+from django.db.models import F ,Sum, IntegerField, Case, When, TimeField , Func , ExpressionWrapper ,CharField ,Q,Value,Count
 import json
 from django.db.models.functions import Cast
 
@@ -57,17 +57,18 @@ class UnAnsweredCallsView(APIView):
             start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())
             end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
                 # Filter and annotate the query
-        
+       
             queryset = QueueLog.objects.filter(
                 time_id__range=(start_timestamp, end_timestamp),
                 queue__in=data['campaigns'],
                 event__in=['ABANDON', 'EXITWITHTIMEOUT', 'EXITWITHKEY']
             ).annotate(
                 CALLID=F('arg4'),
+                formatted_START_DATE=Cast(Func(F('time_id'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
                 START_DATE=F('time_id'),
                 WAIT=F('arg3')
             ).values(
-                'CALLID', 'START_DATE', 'WAIT', 'queue', 'event'
+                'CALLID', 'START_DATE','formatted_START_DATE', 'WAIT', 'queue', 'event'
             ).order_by('time_id')
 
             # Apply pagination

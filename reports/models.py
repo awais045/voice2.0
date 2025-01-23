@@ -24,13 +24,13 @@ class QueueLog(models.Model):
     agent = models.CharField(max_length=50)    
     event = models.CharField(max_length=50)    
     arg1 = models.CharField(max_length=200)    
-    arg2 = models.CharField(max_length=200)    
-    arg3 = models.CharField(max_length=200)    
+    arg2 = models.IntegerField() 
+    arg3 = models.IntegerField()    
     arg4 = models.CharField(max_length=200)    
     arg5 = models.CharField(max_length=200)    
     last_row = models.IntegerField()
     server_ip = models.CharField(max_length=20)    
-    time_id = models.IntegerField()
+    # time_id = models.IntegerField()
     agi_server = models.CharField(max_length=100)
 
     class Meta:

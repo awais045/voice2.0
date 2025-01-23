@@ -71,7 +71,7 @@ def outboundCampaignSummary(startDate , endDate ,skills ,groupOnDate =0 ):
             .filter(
                 start_epoch__range=(startDate, endDate),
                 campaign_name__in=skills,
-                user_length__lt=7
+                user_length__lt=7 
             )
             .values('day_value', 'user')
             .annotate(

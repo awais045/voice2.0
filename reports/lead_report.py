@@ -8,12 +8,14 @@ from datetime import datetime
 import math
 from django.core.paginator import Paginator 
 from django.conf import settings
-from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func , ExpressionWrapper ,CharField ,Q
+from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func , ExpressionWrapper ,CharField ,Q,Value,Count
 import json
 from collections import defaultdict
 from django.db import connections
+from django.db.models.functions import Cast 
 
 #http://127.0.0.1:8000/api/leads_report/?start_date=2024-09-01&end_date=2025-01-09&format=json&clients=Zitro-LLC&queue=IA-English&page_size=22&report_type=upload&lead_id=3
+
 
 class LeadsReportView(APIView):
     def get(self, request):
@@ -84,12 +86,15 @@ class LeadsReportView(APIView):
             # queryset = LeadIn.objects.using(alias).filter(
             #     time_id__range=(start_timestamp, end_timestamp),
             #     queue__in=data['skills']
-            # ).order_by('time_id')
+            # ).order_by('time_id') 
             queryset = LeadIn.objects.using(alias)
             if report_type == 'upload':
                 queryset = queryset.filter(
                     time_id__range=(start_timestamp, end_timestamp),
                     queue__in=data['skills']
+                ).annotate(
+                    formatted_time_id=Cast(Func(F('time_id'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
+                    formatted_modify_time=Cast(Func(F('modify_time'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
                 ).order_by('time_id')
             elif report_type == 'dialing':
                 queryset = queryset.filter(
@@ -103,6 +108,9 @@ class LeadsReportView(APIView):
             paginator = Paginator(queryset, page_size)
             page_obj = paginator.get_page(page_number)
 
+            selectedFields.insert(3, 'formatted_time_id')
+            selectedFields.insert(4, 'formatted_modify_time')
+            print(selectedFields)
             # *** Apply values() to the page_obj.object_list ***
             results = list(page_obj.object_list.values(*selectedFields))
 
