@@ -110,7 +110,7 @@ class LeadsReportView(APIView):
 
             selectedFields.insert(3, 'formatted_time_id')
             selectedFields.insert(4, 'formatted_modify_time')
-            print(selectedFields)
+            # print(selectedFields)
             # *** Apply values() to the page_obj.object_list ***
             results = list(page_obj.object_list.values(*selectedFields))
 

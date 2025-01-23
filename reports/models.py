@@ -148,7 +148,7 @@ class ManualCallsRecording(models.Model):
         ],
         default='deepgram',
     )
-
+    
     class Meta:
         db_table = 'manual_recording_log'
 
