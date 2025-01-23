@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import RegisterAgentLoginsView , AgentLoginsView 
-from .ivr_drop import RegisterIVRDropView
+from .ivr_drop import RegisterIVRDropView ,IVRDropCallsGraphView
 from .unanswered_calls_report import UnAnsweredCallsView ,UnAnsweredCallsGraphView 
 from .manual_calls_report import ManualCallsReportView
 from .lead_report import LeadsReportView
@@ -19,6 +19,7 @@ urlpatterns = [
     path('agent_logins/', AgentLoginsView.as_view(), name='agent_logins'),
     path('agent_login_logout/', AgentLoginsView.as_view(), name='agent_logins'),
     path('ivrdrop_report/', RegisterIVRDropView.as_view(), name='ivrdrop_report'),
+    path('ivrdrop_report/graph/', IVRDropCallsGraphView.as_view(), name='ivrdrop_report_graph'),
     path('unanswered_calls_report/', UnAnsweredCallsView.as_view(), name='unanswered_calls_report'),
     path('unanswered_calls_report/graph/', UnAnsweredCallsGraphView.as_view(), name='unanswered_calls_report_graph'), 
     path('manual_calls_report/', ManualCallsReportView.as_view(), name='manual_calls_report'), 

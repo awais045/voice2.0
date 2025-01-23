@@ -170,17 +170,27 @@ class UnAnsweredCallsGraphView(APIView):
                 )
 
             # Fetch the results
-            data = queryset.values(*[f"Wait_{end}" for start, end in interval_start_end]).first()
+            dataSet = queryset.values(*[f"Wait_{end}" for start, end in interval_start_end]).all()
 
-            series_data = []
-            if data:
-                for key, value in data.items():
-                    series_data.append(int(value))
+            # series_data = []
+            # if data:
+            #     for key, value in data.items():
+            #         series_data.append(int(value))
 
-            # # Check if series data is empty
+            # # # Check if series data is empty
+            # if sum(series_data) <= 0:
+            #     no_of_intervals = []
+            #     series_data = []
+
+            data = {}
+            for values in dataSet:
+                for key, value in values.items():
+                    data[key] = data.get(key, 0) + value
+
+            series_data = list(data.values())
+
             if sum(series_data) <= 0:
-                no_of_intervals = []
-                series_data = []
+                series_data = [] 
 
             return JsonResponse({
                 'data': series_data,

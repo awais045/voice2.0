@@ -1,6 +1,6 @@
 from rest_framework import generics, status ,viewsets
 from rest_framework.response import Response
-from .models import AgentLogins , VirtualQueue , ccmCampaigns , VDN
+from .models import AgentLogins , VirtualQueue , ccmCampaigns , VDN ,QueueLog
 from .serializers import AgentLoginsSerializer ,QueueLogSerializer
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -11,8 +11,8 @@ from datetime import datetime
 import math
 from django.core.paginator import Paginator
 from django.conf import settings
-from django.db.models import F
 import json
+from django.db.models import F ,Sum, IntegerField, Case, When, TimeField , Func , ExpressionWrapper ,CharField ,Q,Value,Count
 
 class RegisterIVRDropView(APIView):
     def get(self, request):
@@ -93,6 +93,105 @@ class RegisterIVRDropView(APIView):
                                     },
                                     "data":serializer.data,
                                 }, status=200)
+        else:
+            return Response({"error": "Start and end dates are required"}, status=400)
+
+
+class IVRDropCallsGraphView(APIView):
+    def get(self, request):
+        no_of_intervals = []
+        QRY = []  # Use a list to build the query parts
+
+        no_of_interval = int(request.GET.get('no_of_interval', 0)) #Get no_of_interval from request
+        interval = int(request.GET.get('interval', 0)) #Get interval from request
+        campaign_str = request.GET.get('campaign')
+        campaign = campaign_str.split(',') if campaign_str else []
+
+        start_date = request.GET.get('start_date') 
+        end_date = request.GET.get('end_date') 
+        start_date = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
+        end_date = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
+        # Check if both dates are provided
+        if not start_date or not end_date:
+            return JsonResponse({"error": "Both start_date and end_date must be provided."}, status=400)
+
+        # Ensure start_date is less than end_date
+        if start_date >= end_date:
+            return JsonResponse({"error": "start_date must be earlier than end_date."}, status=400)
+
+        if not all([no_of_interval, interval ]):
+            return JsonResponse({'error': 'Missing required parameters'}, status=400)
+
+
+        ## get VQ for campaigns
+        virtualQueues = get_campaigns(request)
+        dataCampaigns = json.loads(virtualQueues.content)
+
+        if start_date and end_date:
+            start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())
+            end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
+        
+            no_of_intervals = []
+            interval_conditions = []
+            interval_start_end = []
+
+            for i in range(no_of_interval):
+                interval_end = interval + interval * i
+                if i == 0:
+                    no_of_intervals.append(f"0 - {interval_end}")
+                    interval_conditions.append(
+                        Case(
+                            When(arg1__gte=0, arg1__lte=interval, then=1),
+                            default=0,
+                            output_field=IntegerField()
+                        )
+                    )
+                    interval_start_end.append((0, interval))
+                else:
+                    interval_start = interval + interval * (i - 1) + 1
+                    interval_end = interval_start + interval
+                    no_of_intervals.append(f"{interval_start} - {interval_end}")
+                    interval_conditions.append(
+                        Case(
+                            When(arg1__gte=interval_start, arg1__lte=interval_end, then=1),
+                            default=0,
+                            output_field=IntegerField()
+                        )
+                    )
+                    interval_start_end.append((interval_start, interval_end))
+            
+            # Query the data
+            queryset = QueueLog.objects.filter(
+                time_id__gte=start_timestamp,
+                time_id__lte=end_timestamp,
+                event__in=['IVRDROP'],
+                arg3__in=dataCampaigns['dnis'],
+                arg2__in=dataCampaigns['client_id'],
+            )
+
+            # # Annotate with conditional sums
+            for idx, condition in enumerate(interval_conditions):
+                start, end = interval_start_end[idx]  # Proper unpacking of interval range
+                queryset = queryset.annotate(
+                    **{f"Wait_{end}": Sum(condition)}  # Using the 'end' value for dynamic field name
+                )
+
+            # Fetch the results
+            dataSet = queryset.values(*[f"Wait_{end}" for start, end in interval_start_end]).all()
+            data = {}
+            for values in dataSet:
+                for key, value in values.items():
+                    data[key] = data.get(key, 0) + value
+
+            series_data = list(data.values())
+
+            if sum(series_data) <= 0:
+                series_data = [] 
+
+            return JsonResponse({
+                'data': series_data,
+                'no_of_intervals': no_of_intervals
+            })
         else:
             return Response({"error": "Start and end dates are required"}, status=400)
 
