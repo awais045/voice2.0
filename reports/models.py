@@ -76,9 +76,39 @@ class VDN(models.Model):
     class Meta:
         db_table = 'vdn'
 
+class CcmClients(models.Model):
+    Id = models.AutoField(primary_key=True)
+    client_name = models.CharField(max_length=255, null=True)
+    active = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='Y')
+    url = models.CharField(max_length=128, null=True)
+    poc_name = models.CharField(max_length=128, null=True)
+    poc_cell_num = models.CharField(max_length=128, null=True)
+    poc_email = models.CharField(max_length=128, null=True)
+    seats_num = models.IntegerField(null=True)
+    business = models.CharField(max_length=128, null=True)
+    other_info = models.TextField(null=True)
+    show_voip = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='Y')
+    route_to_afiniti = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='N')
+    call_restriction = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='N')
+    ivr_count = models.SmallIntegerField(default=0)
+    cro_count = models.SmallIntegerField(default=0)
+    db_name = models.CharField(max_length=30, null=True)
+    enable_filters = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='Y')
+    customer_profiling = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='N')
+    is_profiling_campaign = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='N')
+    two_fa_enable = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='N')
+    two_fa_type = models.CharField(max_length=128) 
+    dial_to_agent = models.CharField(max_length=1, choices=(('Y', 'Yes'), ('N', 'No')), default='N')
+    default_campaign_id = models.IntegerField(null=True)
+    default_skill_name = models.CharField(max_length=128, null=True)
+    company_id = models.IntegerField(null=True)
+
+    class Meta:
+        db_table = 'ccm_clients'
+        
 class ccmCampaigns(models.Model):
     campaign_id = models.AutoField(primary_key=True)
-    client = models.CharField(max_length=50, null=True, blank=True)
+    #client = models.CharField(max_length=50, null=True, blank=True)
     campaign = models.CharField(max_length=50, null=True, blank=True)
     form_name = models.CharField(max_length=50, null=True, blank=True)
     name = models.CharField(max_length=50, null=True, blank=True)

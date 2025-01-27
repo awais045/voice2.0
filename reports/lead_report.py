@@ -37,6 +37,14 @@ class LeadsReportView(APIView):
         if start_date >= end_date:
             return JsonResponse({"error": "start_date must be earlier than end_date."}, status=400)
 
+        call_type = request.GET.get('call_type') 
+        allowed_call_types = ['Inbound', 'manual']
+        if not call_type:  # Check if call_type is empty (None or "")
+            return JsonResponse({'error': 'call_type parameter is required.'}, status=400)
+
+        if call_type not in allowed_call_types: #case insensitive check
+            return JsonResponse({'error': 'Invalid call_type. Allowed values are Inbound and manual.'}, status=400)
+
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
         data = json.loads(virtualQueues.content)
@@ -104,6 +112,9 @@ class LeadsReportView(APIView):
 
             if lead_id:
                 queryset = queryset.filter(lead_id=lead_id)
+            
+            if call_type:
+                queryset = queryset.filter(call_type=call_type)
 
             paginator = Paginator(queryset, page_size)
             page_obj = paginator.get_page(page_number)
