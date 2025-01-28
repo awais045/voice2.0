@@ -63,12 +63,12 @@ class UnAnsweredCallsView(APIView):
                 queue__in=data['campaigns'],
                 event__in=['ABANDON', 'EXITWITHTIMEOUT', 'EXITWITHKEY']
             ).annotate(
-                CALLID=F('arg4'),
-                formatted_START_DATE=Cast(Func(F('time_id'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
-                START_DATE=F('time_id'),
-                WAIT=F('arg3')
+                phone=F('arg4'),
+                status=F('event'),
+                call_date=Cast(Func(F('time_id'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
+                duration=F('arg3')
             ).values(
-                'CALLID', 'START_DATE','formatted_START_DATE', 'WAIT', 'queue', 'event'
+                'phone', 'time_id','call_date', 'duration', 'queue', 'status'
             ).order_by('time_id')
 
             # Apply pagination

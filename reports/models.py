@@ -129,6 +129,50 @@ class ccmCampaigns(models.Model):
             db_table = 'ccm_campaigns'
             managed = False
 
+
+class CcmCampaignMember(models.Model):
+    uniqueid = models.AutoField(primary_key=True)
+    membername = models.CharField(max_length=40, blank=True, null=True)
+    queue_name = models.CharField(max_length=128, blank=True, null=True)
+    interface = models.CharField(max_length=128, blank=True, null=True)
+    penalty = models.IntegerField(default=0)
+    paused = models.BooleanField(default=False)
+    full_name = models.CharField(max_length=100, blank=True, null=True)
+    staff_time = models.IntegerField(default=0)
+    extension = models.IntegerField(blank=True, null=True)
+    event_time = models.IntegerField(default=0)
+    status = models.CharField(max_length=100, blank=True, null=True)
+    dial_mode = models.CharField(max_length=30, blank=True, null=True)
+    server_ip = models.CharField(max_length=100, blank=True, null=True)
+    calls_offered_in = models.IntegerField(default=0)
+    calls_answered = models.IntegerField(default=0)
+    calls_ignored = models.IntegerField(default=0)
+    calls_hold_in = models.IntegerField(default=0)
+    aux_reason = models.CharField(max_length=100, blank=True, null=True)
+    total_talk_time = models.IntegerField(default=0)
+    total_aux_time = models.IntegerField(default=0)
+    total_acw_time = models.IntegerField(default=0)
+    total_hold_time_in = models.IntegerField(default=0)
+    total_transfer_calls_in = models.IntegerField(default=0)
+    no_of_sessions = models.IntegerField(default=0)
+    last_login_time = models.IntegerField(default=0)
+    calls_ringing_time = models.IntegerField(default=0)
+    calls_ignore_time_in = models.IntegerField(default=0)
+    reg_ip = models.CharField(max_length=30, blank=True, null=True)
+    active = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], default='Y')
+    aux_id = models.IntegerField(default=0)
+    login_id = models.IntegerField(default=0)
+    client_campaign_id = models.IntegerField(blank=True, null=True)
+    client_id = models.IntegerField(blank=True, null=True)
+    ccm_campaign_id = models.IntegerField(blank=True, null=True)
+    remote_number = models.CharField(max_length=255, blank=True, null=True)
+    is_remote = models.BooleanField(default=False)
+    auto_unwrap_time = models.PositiveSmallIntegerField(default=1000)
+
+    class Meta:
+        db_table = 'ccm_campaign_members'
+        unique_together = (('queue_name', 'interface'),)
+
 class ManualCallsRecording(models.Model):
     
     recording_id = models.AutoField(primary_key=True)

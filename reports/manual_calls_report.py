@@ -59,9 +59,9 @@ class ManualCallsReportView(APIView):
                 start_epoch__range=(start_timestamp, end_timestamp),
                 campaign_name__in=data['campaigns']
             ).annotate(
-                formatted_dateTime=Cast(Func(F('start_epoch'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
+                callFormattedDateTime=Cast(Func(F('start_epoch'),Value('%Y-%m-%d %H:%i:%s'),function='FROM_UNIXTIME'),output_field=CharField()),
                 dateTime= F('start_epoch')  ,
-                billSec=F('length_in_sec'),
+                durationSec=F('length_in_sec'),
                 cliNum=F('extension'),
                 campaignName=F('campaign_name'),
                 sourceName=F('vendor'),
@@ -72,7 +72,7 @@ class ManualCallsReportView(APIView):
                     Ceil(F('length_in_sec') / 60.0),  # Using custom CEIL function
                     output_field=IntegerField()
                 ),
-                ringing_time= 
+                ringingTime= 
                     Case(
                         When(end_epoch__gt=0, then=(F('end_epoch') - F('start_epoch') - F('duration'))),
                         default=0,
@@ -91,16 +91,16 @@ class ManualCallsReportView(APIView):
             page_obj = paginator.get_page(page_number)  # `page_number` is the current page number
             # Results for the current page
             results = list(queryset.values(
-                        'formatted_dateTime',
+                        'callFormattedDateTime',
                         'dateTime',
-                        'billSec',
+                        'durationSec',
                         'cliNum',
                         'campaignName',
                         'sourceName',
                         'dialStatus',
                         'agentExt',
                         'disconnectedBy',
-                        'ringing_time',
+                        'ringingTime',
                         'totalPulses',
                         'lead_id'
                     ))

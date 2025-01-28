@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from rest_framework.views import APIView
 from datetime import datetime ,timedelta, date
-from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func  ,CharField ,Q,Value,Count,Min, Max,ExpressionWrapper
+from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func  ,CharField ,Q,Value,Count,Min, Max,ExpressionWrapper,Value
 import json
 from collections import defaultdict
 from django.db import connections ,connection
@@ -65,7 +65,7 @@ class CampaignSummaryReportView(APIView):
 
 def getCallStatResult(startDate,endDate,skills,group_by,group_on_date):
 
-     
+    start_date_value = Value(startDate) 
     queryset = (
             QueueLog.objects
             .annotate(
@@ -78,34 +78,45 @@ def getCallStatResult(startDate,endDate,skills,group_by,group_on_date):
             .values('agent', 'queue', 'dte','time_id' )
             .annotate(
                 calls1=Count('*'),
-                # talk_time= Sum(
-                #     Case(
-                #         When(
-                #             event='TRANSFER',
-                #             then=Case(
-                #                 When(F('time_id') - Abs(F('arg3')) < startDate, then=F('time_id') - startDate),
-                #                 default=Abs(F('arg3')),
-                #                 output_field=IntegerField(),
-                #             ),
-                #         ),
-                #         When(
-                #             ~Q(event='NONVOICEEND'),
-                #             then=Case(
-                #                 When(F('time_id') - Abs(F('arg2')) < startDate, then=F('time_id') - startDate),
-                #                 default=Abs(F('arg2')),
-                #                 output_field=IntegerField(),
-                #             ),
-                #         ),
-                #         default=Value(0),
-                #         output_field=IntegerField(),
-                #     )
-                # ),
+                talk_time = Sum(
+                    Case(
+                        # Handling TRANSFER event
+                        When(
+                            event='TRANSFER',
+                            then=Case(
+                                # If (time_id - abs(arg3)) is less than startDate, use (time_id - startDate)
+                                When(
+                                    time_id__lt=F('time_id') - Abs(F('arg3')) - Value(startDate),
+                                    then=F('time_id') - Value(startDate),
+                                ),
+                                default=Abs(F('arg3')),
+                                output_field=IntegerField(),
+                            ),
+                        ),
+                        # Handling all other events except NONVOICEEND
+                        When(
+                            ~Q(event='NONVOICEEND'),
+                            then=Case(
+                                # If (time_id - abs(arg2)) is less than startDate, use (time_id - startDate)
+                                When(
+                                    time_id__lt=F('time_id') - Abs(F('arg2')) - Value(startDate),
+                                    then=F('time_id') - Value(startDate),
+                                ),
+                                default=Abs(F('arg2')),
+                                output_field=IntegerField(),
+                            ),
+                        ),
+                        # Default case
+                        default=Value(0),
+                        output_field=IntegerField(),
+                    )
+                ),
                 inside=Sum(Case( When(event='TRANSFER', then=Value(1)),default=Value(0),output_field=CharField())),
                 hold=Sum(Case(When(event='HOLD', then=F('time_id')),default=Value(0))),
                 un_hold=Sum(Case(When(event='UNHOLD', then=F('time_id')),default=Value(0))),
                 non_voice=Sum(Case(When(event='NONVOICEEND', then=Value(1)),default=Value(0))),
                 calls=Sum(Case(When(event__in=['COMPLETECALLER', 'COMPLETEAGENT', 'TRANSFER'], then=Value(1)),default=Value(0)))
-            ).order_by('agent').values( 'hold','un_hold','non_voice','calls','calls1' ,'inside','dte' )
+            ).order_by('agent').values( 'hold','un_hold','non_voice','calls','calls1' ,'inside','dte','talk_time' )
         )
     print(queryset.query)
 

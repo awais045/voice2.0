@@ -68,19 +68,6 @@ class CallsRecordingsView(APIView):
             end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
 
             if(call_type == 'MANUAL'):
-                # get form fields and mapping with data 
-                #form_name = data['form_name']
-                #formFieldsArray = getCampaignFields(form_name)
-                #formFieldsArray = json.loads(formFieldsArray.content)
-                #selectedFields = formFieldsArray['select_fields']
-                # Get the default database connection settings
-                #new_database_name = data['new_database_name']
-                #current_db_settings = connections.databases['default'].copy()
-                # Update the NAME (database name) to the dynamic one
-                #current_db_settings['NAME'] = new_database_name
-                # Add a new connection with a unique alias
-                #alias = f'dynamic_{new_database_name}'
-                #connections.databases[alias] = current_db_settings
 
                 # Filter and annotate the query
                 queryset = ManualCallsRecording.objects.filter(
@@ -123,13 +110,11 @@ class CallsRecordingsView(APIView):
                     'has_next': page_obj.has_next(),
                     'has_previous': page_obj.has_previous(),
                 }
-
                 return Response({
                                     "message":"Manual Calls Report.",
                                     "pagination": pagination_info,
                                     "data": results.data,
                                 }, status=200)
-
 
 
             ## INBOUND Call REcordings

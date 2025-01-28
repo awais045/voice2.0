@@ -87,20 +87,21 @@ class FetchLeadsReportView(APIView):
             # Convert RawQuerySet results into a list of dictionaries manually
             results = [
                 {
-                    "lead_id": row.lead_id,
-                    "time_id": row.time_id,
-                    "manual_id": row.manual_id,
+                    "leadId": row.lead_id,
+                    "manualId": row.manual_id,
+                    "cli": row.cli,
+                    "skill": row.campaign,
+                    "campaign_name": row.campaign_name,
                     "cnt": row.cnt,
-                    "total_call_duration": row.total_call_duration,
-                    "total_talk_time": row.total_talk_time,
-                    "formatted_time_id": row.formatted_time_id,
+                    "totalCallDuration": get_time(row.total_call_duration),
+                    "totalTalkTime": get_time(row.total_talk_time),
+                    "fetchTime": row.formatted_time_id,
+                    "wrapUpTime":get_time(row.time_spent - row.total_talk_time) if (row.time_spent - row.total_talk_time) else "00:00:00",
                     "user": row.user,
                     "diposition": row.diposition,
                     "dial_status": row.dial_status,
-                    "time_spent": row.time_spent,
-                    "campaign_name": row.campaign_name,
-                    "campaign": row.campaign,
-                    "recording_id": row.recording_id,
+                    "timeSpent": get_time(row.time_spent),
+                    "recordingId": row.recording_id,
                     "id": row.id,
                 }
                 for row in queryset
@@ -190,3 +191,18 @@ class TimeDiff(Func):
     arity = 1
     output_field = TimeField()
 
+def get_time(seconds, with_hour=True):
+    # Calculate hours, minutes, and seconds
+    hr = seconds // 3600
+    min = (seconds % 3600) // 60
+    sec = seconds % 60
+
+    # Reset hours to 0 if it equals 24
+    if hr == 24:
+        hr = 0
+
+    # Format the time components with leading zeros
+    if with_hour:
+        return f"{hr:02}:{min:02}:{sec:02}"
+    else:
+        return f"{min:02}:{sec:02}"
