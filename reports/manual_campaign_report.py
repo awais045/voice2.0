@@ -1,10 +1,10 @@
 from rest_framework.response import Response
-from .models import ccmCampaigns ,CampaignField  ,VirtualQueue ,ManualCallsRecording,AgentLogins , AgentLogOutbound
+from .models import ccmCampaigns ,CampaignField  ,VirtualQueue ,ManualCallsRecording,AgentLogins , QueueLog,AgentBreak,AgentLogOutbound
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from rest_framework.views import APIView
-from datetime import datetime 
-from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func  ,CharField ,Q,Value,Count
+from datetime import datetime ,timedelta, date
+from django.db.models import F ,Sum, IntegerField, Case, When , TimeField , Func  ,CharField ,Q,Value,Count,Min, Max,ExpressionWrapper,Value
 import json
 from collections import defaultdict
 from django.db import connections
@@ -52,7 +52,7 @@ class ManualCampaignReportView(APIView):
 
             response = {
                 'message':"Manual Campaign Summary Report",
-                'data': dataResult,
+                'data': dataResult
             }
             return JsonResponse(response)
         else:
@@ -97,7 +97,16 @@ def outboundCampaignSummary(startDate , endDate ,skills ,groupOnDate =0 ):
                         )
             ).values( 'day_value', 'user', 'lead_no', 'manual_count', 'total_time', 'answer_count', 'call_process_time')
         )
-
+    
+    # get agent login and breaks data 
+    resultDataAgentLogin = getAgentLoginsAndBreaksData( startDate , endDate , skills , '' , groupOnDate )
+    dataResultAgentLogin = json.loads(resultDataAgentLogin.content)
+    
+    if dataResultAgentLogin.get('agentBreaks', {}).get('agent_logins', []):
+        dataResultAgentLoginData = dataResultAgentLogin['agentBreaks']['agent_logins']
+    else:
+        dataResultAgentLoginData = {}
+    
     agent = {}
     for resAgent in queryset:
         # Calculate CALL_PROCESS_TIME if needed
@@ -119,12 +128,23 @@ def outboundCampaignSummary(startDate , endDate ,skills ,groupOnDate =0 ):
 
             agent[day_value][user]["LEAD_NO"] = resAgent['lead_no']
             agent[day_value][user]["MANUAL"] = resAgent['manual_count']
-            agent[day_value][user]["CALL_PROCESS_TIME"] = resAgent['call_process_time']
-            agent[day_value][user]["TTIME"] = resAgent['total_time']
+            agent[day_value][user]["CALL_PROCESS_TIME"] = gettime(resAgent['call_process_time'])
+            agent[day_value][user]["TTIME"] = gettime(resAgent['total_time'])
             agent[day_value][user]["ANSWER"] = resAgent['answer_count']
-            agent[day_value][user]["totalRingtime"] = totalRingtime
+            agent[day_value][user]["totalRingtime"] = gettime(totalRingtime)
             agent[day_value][user]["THT"] = 0
             agent[day_value][user]["bcwAcw"] = 0
+            
+            if 'aux' in dataResultAgentLoginData[day_value][user]:
+                agent[day_value][user]['aux'] = gettime(dataResultAgentLoginData[day_value][user]['aux'])
+            else:
+                agent[day_value][user]['aux'] = gettime(0)
+
+            if 'manual' in dataResultAgentLoginData[day_value][user]:
+                agent[day_value][user]['manual'] = gettime(dataResultAgentLoginData[day_value][user]['manual'])
+            else:
+                agent[day_value][user]['manual'] = gettime(0) 
+                 
 
         else:
             user = resAgent['user']
@@ -134,18 +154,19 @@ def outboundCampaignSummary(startDate , endDate ,skills ,groupOnDate =0 ):
 
             agent[user]["LEAD_NO"] = resAgent['lead_no']
             agent[user]["MANUAL"] = resAgent['manual_count']
-            agent[user]["CALL_PROCESS_TIME"] = resAgent['call_process_time']
-            agent[user]["TTIME"] = resAgent['total_time']
+            agent[user]["CALL_PROCESS_TIME"] = gettime(resAgent['call_process_time'])
+            agent[user]["TTIME"] = gettime(resAgent['total_time'])
             agent[user]["ANSWER"] = resAgent['answer_count']
-            agent[user]["totalRingtime"] = totalRingtime
+            agent[user]["totalRingtime"] = gettime(totalRingtime)
             agent[user]["THT"] = 0
             agent[user]["bcwAcw"] = 0
-
+            agent[user]['manual'] = gettime(0)
+            agent[user]['aux'] = gettime(0)
 
     agentLogOutboundJson = agentLogOutBound(startDate , endDate ,skills ,groupOnDate)
     agentLogOutboundRows = json.loads(agentLogOutboundJson.content)
 
-
+    print(agentLogOutboundRows)
     if agentLogOutboundRows['agentData']:
         if groupOnDate:
             for date_key_val, user_detail in agentLogOutboundRows['agentData'].items():
@@ -227,7 +248,253 @@ def agentLogOutBound(startDate , endDate ,skills ,groupOnDate):
     }
     return JsonResponse(response)
 
-def getAgentLogins(startDate,endDate,skills,groupBy,groupOnDate):
+
+def getAgentLoginsAndBreaksData(startDate,endDate,skills,group_by,group_on_date):
+    
+    # Filter and annotate the query
+    logins = AgentLogins.objects.filter(
+            Q(endTime__range=(startDate, endDate)) | 
+            Q(startTime__lt=startDate, endTime__gt=endDate)
+        ).filter(
+            queue__in=skills
+        ).values('time_id', 'extension', 'queue').annotate(
+            calc_starttime=Min(
+                Case(
+                    When(startTime__lt=startDate, then=Value(startDate)),
+                    default=F('startTime'),
+                    output_field=IntegerField()
+                )
+            ),
+            calc_endtime=Max(
+                Case(
+                    When(endTime__gt=endDate, then=Value(endDate)),
+                    default=F('endTime'),
+                    output_field=IntegerField()
+                )
+            )
+        ).order_by('queue', 'extension').values('time_id', 'extension', 'calc_starttime', 'calc_endtime','queue')
+
+    # Required mappings and placeholders (replace these appropriately)
+    agent_names = {}   
+    queue_mapping = {}  
+    for skill in skills:
+        queue_mapping[skill] = {skill}
+        
+    added_rec = {}   
+    agent_logins = {}   
+
+    # group_on_date = True   
+    # group_by = "agent"   
+
+    for login_info in logins:
+
+        extension = login_info['extension']
+        full_name = extension
+        db_queue = login_info['queue']
+
+        calc_start = login_info['calc_starttime']
+        db_calc_start = login_info['calc_starttime']
+        start_time = datetime.fromtimestamp(calc_start).strftime("%Y-%m-%d")
+
+        calc_end = login_info['calc_endtime']
+        db_calc_end = login_info['calc_endtime']
+
+        time_id = login_info['time_id']
+        diff_in_days = date_diff_in_days(calc_start, calc_end)
+        # Example use of fields
+        # print(f"Extension: {extension}, Queue: {db_queue}, Start: {calc_start}, End: {calc_end}, Time ID: {time_id}")
+        i = 0
+        is_added = False
+        if group_on_date:
+            while i <= diff_in_days:
+                if i > 0:
+                    calc_start_datetime = datetime.fromtimestamp(calc_start)  # Convert to datetime object
+                    start_time = calc_start_datetime + timedelta(days=1)  # Add one day
+                    start_time = start_time.strftime("%Y-%m-%d") 
+
+                if diff_in_days > 0 and i < diff_in_days:
+                    calc_end = int(datetime.fromtimestamp(calc_start + 86400).replace(hour=0, minute=0, second=0).timestamp())
+                elif i == diff_in_days:
+                    calc_end = db_calc_end
+
+                diff_time = calc_end - calc_start
+                if diff_time > 0:
+                    if group_by in ["campaign", "agent"]:
+                        for queue in queue_mapping.get(db_queue, []):
+                            if added_rec.get(queue, {}).get(extension, {}).get(time_id):
+                                continue
+
+                            added_rec.setdefault(queue, {}).setdefault(extension, {})[time_id] = 1
+
+                            if group_by == "campaign":
+                                agent_logins.setdefault(queue, {}).setdefault(extension, {}).setdefault(start_time, {'login': 0, 'name': full_name})['login'] += diff_time
+                            elif group_by == "agent":
+                                agent_logins.setdefault(extension, {}).setdefault(queue, {}).setdefault(start_time, {'login': 0, 'name': full_name})['login'] += diff_time
+                    else:
+                        agent_logins.setdefault(start_time, {}).setdefault(extension, {'login': 0, 'name': full_name})['login'] += diff_time
+
+                i += 1
+        else:
+            diff_time = calc_end - calc_start
+            if diff_time == 0:
+                continue
+
+            if group_by in ["campaign", "agent"]:
+                for queue in queue_mapping.get(db_queue, []):
+                    print(queue)
+                    if added_rec.get(queue, {}).get(extension, {}).get(time_id):
+                        continue
+
+                    added_rec.setdefault(queue, {}).setdefault(extension, {})[time_id] = 1
+
+                    if group_by == "campaign":
+                        agent_logins.setdefault(queue, {}) \
+                                    .setdefault(extension, {}) \
+                                    .setdefault(start_time, {'login': 0, 'name': full_name})['login'] += diff_time
+                        agent_logins[queue][extension][start_time]['name'] = full_name 
+
+                    elif group_by == "agent":
+                        agent_logins.setdefault(extension, {}) \
+                        .setdefault(start_time, {'login': 0, 'name': full_name})['login'] += diff_time
+                        agent_logins[extension][start_time]['name'] = full_name 
+            else:
+                agent_logins.setdefault(extension, {'login': 0, 'name': full_name})['login'] += diff_time
+
+    agentBreaksResponse = getAgentBreak(startDate,endDate,skills,group_by,group_on_date , agent_logins )
+    agentBreaksResult = json.loads(agentBreaksResponse.content)
+    response = {
+        # 'agent_logins': agent_logins,
+        'agentBreaks': agentBreaksResult,
+    }
+    return JsonResponse(response)
+        
+
+def getAgentBreak(startDate,endDate,skills,group_by,group_on_date , agent_queue_logins ):
+    
+    # Filter and annotate the query
+    breakResult = AgentBreak.objects.filter(
+            Q(endTime__range=(startDate, endDate)) | 
+            Q(startTime__lt=startDate, endTime__gt=endDate)
+        ).filter(
+            queue__in=skills
+        ).values('time_id', 'extension', 'queue','breakCode').annotate(
+            calc_starttime=Min(
+                Case(
+                    When(startTime__lt=startDate, then=Value(startDate)),
+                    default=F('startTime'),
+                    output_field=IntegerField()
+                )
+            ),
+            calc_endtime=Max(
+                Case(
+                    When(endTime__gt=endDate, then=Value(endDate)),
+                    default=F('endTime'),
+                    output_field=IntegerField()
+                )
+            )
+        ).order_by( 'extension').values('time_id', 'extension','breakCode', 'calc_starttime', 'calc_endtime','queue','fullName')
+
+    # Required mappings and placeholders (replace these appropriately)
+    agent_names = {}   
+    queue_mapping = {}  
+    for skill in skills:
+        queue_mapping[skill] = {skill}
+    
+    added_rec = {}
+    for row in breakResult:
+        extension = row['extension']
+        db_queue = row['queue']
+        diff_time = row['calc_endtime'] - row['calc_starttime']
+        start_time = datetime.fromtimestamp(row['calc_starttime']).strftime("%Y-%m-%d")
+        time_id = row['time_id']
+        break_code = row['breakCode']
+
+        if diff_time == 0:
+            continue
+
+        if group_on_date:
+            i = 0
+            calc_end = row['calc_endtime']
+            db_calc_end = row['calc_endtime']
+            calc_start = row['calc_starttime']
+            diff_in_days = date_diff_in_days(calc_start, calc_end)
+            start_time = datetime.fromtimestamp(calc_start).strftime("%Y-%m-%d")
+
+            while i <= diff_in_days:
+                if i > 0:
+                    calc_start = int((datetime.fromtimestamp(calc_start) + timedelta(days=1)).timestamp())
+                    start_time = datetime.fromtimestamp(calc_start).strftime("%Y-%m-%d")
+
+                if diff_in_days > 0 and i < diff_in_days:
+                    calc_end = int((datetime.fromtimestamp(calc_start) + timedelta(days=1)).timestamp())
+                elif i == diff_in_days:
+                    calc_end = db_calc_end
+                
+                diff_time = calc_end - calc_start
+
+                if diff_time > 0:
+                    process_queue_logic(queue_mapping, db_queue, extension, time_id, break_code, agent_queue_logins, added_rec, group_by, start_time, diff_time)
+                i += 1
+        else:
+            process_queue_logic(queue_mapping, db_queue, extension, time_id, break_code, agent_queue_logins, added_rec, group_by, start_time, diff_time)
+    
+    response = {
+        'agent_logins': agent_queue_logins,
+    }
+    return JsonResponse(response)
+      
+
+def process_queue_logic(queue_mapping, db_queue, extension, time_id, break_code, agent_queue_logins, added_rec, group_by, start_time, diff_time):
+    if break_code == "WRAPUP":
+        return
+    
+    if break_code == "MANUALDIAL":
+        process_manual_dial(queue_mapping, db_queue, extension, time_id, break_code, agent_queue_logins, added_rec, group_by, start_time, diff_time)
+    else:
+        process_aux(queue_mapping, db_queue, extension, time_id, break_code, agent_queue_logins, added_rec, group_by, start_time, diff_time)
+
+def process_manual_dial(queue_mapping, db_queue, extension, time_id, break_code, agent_queue_logins, added_rec, group_by, start_time, diff_time):
+    if group_by in ["campaign", "agent"]:
+        for queue in queue_mapping.get(db_queue, []):
+            if added_rec.get(queue, {}).get(extension, {}).get(time_id, {}).get(break_code):
+                continue
+            added_rec.setdefault(queue, {}).setdefault(extension, {}).setdefault(time_id, {})[break_code] = 1
+            
+            if group_by == "campaign":
+                agent_queue_logins.setdefault(queue, {}).setdefault(extension, {}).setdefault(start_time, {}).setdefault('manual', 0)
+                agent_queue_logins[queue][extension][start_time]['manual'] += diff_time
+            elif group_by == "agent":
+                agent_queue_logins.setdefault(extension, {}).setdefault(queue, {}).setdefault(start_time, {}).setdefault('manual', 0)
+                agent_queue_logins[extension][queue][start_time]['manual'] += diff_time
+    else:
+        agent_queue_logins.setdefault(start_time, {}).setdefault(extension, {}).setdefault('manual', 0)
+        agent_queue_logins[start_time][extension]['manual'] += diff_time
+
+def process_aux(queue_mapping, db_queue, extension, time_id, break_code, agent_queue_logins, added_rec, group_by, start_time, diff_time):
+    if group_by in ["campaign", "agent"]:
+        for queue in queue_mapping.get(db_queue, []):
+            if added_rec.get(queue, {}).get(extension, {}).get(time_id, {}).get(break_code):
+                continue
+            added_rec.setdefault(queue, {}).setdefault(extension, {}).setdefault(time_id, {})[break_code] = 1
+            
+            if group_by == "campaign":
+                agent_queue_logins.setdefault(queue, {}).setdefault(extension, {}).setdefault(start_time, {}).setdefault('aux', 0)
+                agent_queue_logins[queue][extension][start_time]['aux'] += diff_time
+            elif group_by == "agent":
+                agent_queue_logins.setdefault(extension, {}).setdefault(queue, {}).setdefault(start_time, {}).setdefault('aux', 0)
+                agent_queue_logins[extension][queue][start_time]['aux'] += diff_time
+    else:
+        agent_queue_logins.setdefault(start_time, {}).setdefault(extension, {}).setdefault('aux', 0)
+        agent_queue_logins[start_time][extension]['aux'] += diff_time
+
+
+def date_diff_in_days(start, end):
+    """Calculate difference in days between two timestamps."""
+    start_date = datetime.fromtimestamp(start)
+    end_date = datetime.fromtimestamp(end)
+    return (end_date - start_date).days
+ 
+def getAgentLoginsBackup(startDate,endDate,skills,groupBy,groupOnDate):
     
     orderBy = 'extension'
     if groupBy == 'campaign':
@@ -380,9 +647,15 @@ def getCampaignFields(formName):
 
 def date_diff_in_days(start, end):
     """Calculate difference in days between two timestamps."""
-    start_date = datetime.date.fromtimestamp(start)
-    end_date = datetime.date.fromtimestamp(end)
+    start_date = datetime.fromtimestamp(start)
+    end_date = datetime.fromtimestamp(end)
     return (end_date - start_date).days
+
+# def date_diff_in_days(start, end):
+#     """Calculate difference in days between two timestamps."""
+#     start_date = datetime.date.fromtimestamp(start)
+#     end_date = datetime.date.fromtimestamp(end)
+#     return (end_date - start_date).days
 
 def add_dynamic_connection(alias, config):
     connections.databases[alias] = config
@@ -455,3 +728,20 @@ class TimeDiff(Func):
 
 # def FROM_UNIXTIME(timestamp):
 #     return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
+def gettime(time, with_hour=True):
+    min_time = time % 3600
+    hr = (time - min_time) // 3600
+    if hr == 24:
+        hr = 0
+    sec = min_time % 60
+    min_time = (min_time - sec) // 60
+    if hr < 10:
+        hr = f"0{hr}"
+    if min_time < 10:
+        min_time = f"0{min_time}"
+    if sec < 10:
+        sec = f"0{sec}"
+
+    # Use proper formatting
+    return f"{hr}:{min_time}:{sec}" if with_hour else f"{min_time}:{sec}"

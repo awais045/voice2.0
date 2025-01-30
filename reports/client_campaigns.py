@@ -1,5 +1,5 @@
 from rest_framework.response import Response
-from .models import ccmCampaigns ,CcmCampaignMember ,CcmClients
+from .models import ccmCampaigns , CcmCampaignMember , CcmClients , CampaignShowDisposition
 from django.http import JsonResponse
 from rest_framework.views import APIView
 from collections import defaultdict
@@ -28,12 +28,17 @@ class ClientCampaignView(APIView):
             campaigns = ccmCampaigns.objects.filter(client_id=client_id)
             
             if queue:
+                
                 members = CcmCampaignMember.objects.filter(
                     Q(queue_name=queue)
                 )
                 member_dict = {  member.interface.replace("Agent/", ""): member.membername for member in members}
-
-            
+                
+                queueDispositions = CampaignShowDisposition.objects.filter(
+                    Q(Campaign_id=queue)
+                )
+                assignDispositions = {  disp.status: disp.status for disp in queueDispositions}
+   
             client_campaigns[client_id] = {
                 "client_name": client.client_name,
                 "client_id": client.Id,
@@ -41,7 +46,8 @@ class ClientCampaignView(APIView):
                     {"campaign_id": campaign.campaign_id, "campaign_name": campaign.name} 
                     for campaign in campaigns
                 ],
-                "agents": member_dict
+                "agents": member_dict,
+                "assignDispositions": assignDispositions,
             }
 
         response = {

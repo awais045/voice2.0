@@ -37,17 +37,17 @@ class UnAnsweredCallsView(APIView):
         if start_date >= end_date:
             return JsonResponse({"error": "start_date must be earlier than end_date."}, status=400)
 
+        selectedQueue = request.GET.getlist('queue')
+        # Validation: Ensure at least one item is selected
+        if not selectedQueue:
+            return JsonResponse({'error': 'At least one Queue/Skill must be selected'}, status=400)
+        
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
         data = json.loads(virtualQueues.content)
-        # print("\nAccessing data after response:")
-        print(f"Campaigns: {data['campaigns']}")
-        # print(f"Client IDs: {data['client_id']}")
-        # print(f"Client Campaign IDs: {data['client_campaigns_ids']}")
-        # print(f"DNIS: {data['dnis']}")
         ## end get VQ 
         if not data['campaigns'] or data['client_id'] is None: # Corrected condition
-            return JsonResponse({"error": "No Campaigns."}, status=404) # Return error response with 404
+            return JsonResponse({"error": "No Campaigns Found Against Selected Filter, Please check Virtual Queue."}, status=404)  
 
         # Ensure the range is within 200 days
         if (end_date - start_date).days > 200:
@@ -103,8 +103,8 @@ class UnAnsweredCallsGraphView(APIView):
 
         no_of_interval = int(request.GET.get('no_of_interval', 0)) #Get no_of_interval from request
         interval = int(request.GET.get('interval', 0)) #Get interval from request
-        campaign_str = request.GET.get('campaign')
-        campaign = campaign_str.split(',') if campaign_str else []
+        # campaign_str = request.GET.get('campaign')
+        # campaign = campaign_str.split(',') if campaign_str else []
 
         start_date = request.GET.get('start_date') 
         end_date = request.GET.get('end_date') 
@@ -121,6 +121,18 @@ class UnAnsweredCallsGraphView(APIView):
         if not all([no_of_interval, interval ]):
             return JsonResponse({'error': 'Missing required parameters'}, status=400)
 
+        selectedQueue = request.GET.getlist('queue')
+        # Validation: Ensure at least one item is selected
+        if not selectedQueue:
+            return JsonResponse({'error': 'At least one Queue/Skill must be selected'}, status=400)
+        
+        ## get VQ for campaigns
+        virtualQueues = get_campaigns(request)
+        data = json.loads(virtualQueues.content)
+        ## end get VQ 
+        if not data['campaigns'] or data['client_id'] is None: # Corrected condition
+            return JsonResponse({"error": "No Campaigns Found Against Selected Filter, Please check Virtual Queue."}, status=404)  
+        
         if start_date and end_date:
             start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())
             end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
@@ -158,7 +170,7 @@ class UnAnsweredCallsGraphView(APIView):
             queryset = QueueLog.objects.filter(
                 time_id__gte=start_timestamp,
                 time_id__lte=end_timestamp,
-                queue__in=campaign,
+                queue__in=data['campaigns'],
                 event__in=['ABANDON', 'EXITWITHTIMEOUT', 'EXITWITHKEY']
             )
 
@@ -207,9 +219,9 @@ def get_campaigns(request):
         active='Y'
     )
     # Additional filter if 'queue' is provided and not 'all'
-    queue = request.GET.get('queue', '')
-    if queue != 'all' and queue != '':
-        res_campaigns_query = res_campaigns_query.filter(virtual_queue=queue)
+    queue =request.GET.getlist('queue')
+    if not any(str(item).lower() == 'all' for item in queue) and queue:
+        res_campaigns_query = res_campaigns_query.filter(virtual_queue__in=queue)
 
     # Convert query results into an array
     campaigns = [res_campaign.queue for res_campaign in res_campaigns_query]

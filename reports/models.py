@@ -622,3 +622,23 @@ class AgentBreak(models.Model):
     class Meta:
         managed = False
         db_table = 'agentBreaks'
+        
+        
+class CampaignShowDisposition(models.Model):
+    Campaign_id = models.CharField(max_length=50, primary_key=True)
+    status = models.CharField(max_length=255, null=True, blank=True)
+    display = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], default='Y')
+    crm_display = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], default='Y')
+    category = models.CharField(max_length=50, null=True, blank=True)
+    finalized = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], default='N')
+    is_callback = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], default='N')
+    is_personal_callback = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], default='N')
+    is_voice = models.CharField(max_length=1, choices=[('N', 'No'), ('Y', 'Yes')], default='Y')
+    is_nonvoice = models.CharField(max_length=1, choices=[('N', 'No'), ('Y', 'Yes')], default='N')
+
+    class Meta:
+        db_table = 'campaign_show_disposition'
+        indexes = [
+            models.Index(fields=['Campaign_id'], name='idx_campaign'),
+            models.Index(fields=['status'], name='status'),
+        ]

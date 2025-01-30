@@ -48,6 +48,10 @@ class FetchLeadsReportView(APIView):
         if call_type.upper() not in allowed_call_types: #case insensitive check
             return JsonResponse({'error': 'Invalid call_type. Allowed values are INBOUND and MANUAL.'}, status=400)
 
+        selectedQueue = request.GET.getlist('queue')
+        # Validation: Ensure at least one item is selected
+        if not selectedQueue:
+            return JsonResponse({'error': 'At least one Queue/Skill must be selected'}, status=400)
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
         data = json.loads(virtualQueues.content)
@@ -79,10 +83,10 @@ class FetchLeadsReportView(APIView):
                 LEFT JOIN manual_recording_log AS b
                     ON a.lead_id = b.lead_id AND a.manual_id = b.manual_id
                 WHERE a.time_id BETWEEN %s AND %s
-                    AND a.status NOT LIKE %s
+                    AND a.status NOT LIKE %s AND a.campaign in %s
                 GROUP BY a.manual_id
                 ORDER BY a.id ASC
-            """, [start_timestamp, end_timestamp,   "%lock%"])
+            """, [start_timestamp, end_timestamp,   "%lock%", data['skills']])
            
             # Convert RawQuerySet results into a list of dictionaries manually
             results = [
@@ -135,9 +139,9 @@ def get_campaigns(request):
     )
 
     # Additional filter if 'queue' is provided and not 'all'
-    queue = request.GET.get('queue', '')
-    if queue != 'all' and queue != '':
-        res_campaigns_query = res_campaigns_query.filter(virtual_queue=queue)
+    queue =request.GET.getlist('queue')
+    if not any(str(item).lower() == 'all' for item in queue) and queue:
+        res_campaigns_query = res_campaigns_query.filter(virtual_queue__in=queue)
 
     # Convert query results into an array
     campaigns = [res_campaign.queue for res_campaign in res_campaigns_query]

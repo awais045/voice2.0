@@ -65,7 +65,7 @@ class CampaignSummaryReportView(APIView):
 
 def getCallStatResult(startDate,endDate,skills,group_by,group_on_date):
 
-    start_date_value = Value(startDate) 
+    print(skills)
     queryset = (
             QueueLog.objects
             .annotate(
@@ -111,17 +111,72 @@ def getCallStatResult(startDate,endDate,skills,group_by,group_on_date):
                         output_field=IntegerField(),
                     )
                 ),
-                inside=Sum(Case( When(event='TRANSFER', then=Value(1)),default=Value(0),output_field=CharField())),
+                inside=Sum(Case( When(event='TRANSFER', then=Value(1)),default=Value(0))),
                 hold=Sum(Case(When(event='HOLD', then=F('time_id')),default=Value(0))),
                 un_hold=Sum(Case(When(event='UNHOLD', then=F('time_id')),default=Value(0))),
                 non_voice=Sum(Case(When(event='NONVOICEEND', then=Value(1)),default=Value(0))),
                 calls=Sum(Case(When(event__in=['COMPLETECALLER', 'COMPLETEAGENT', 'TRANSFER'], then=Value(1)),default=Value(0)))
-            ).order_by('agent').values( 'hold','un_hold','non_voice','calls','calls1' ,'inside','dte','talk_time' )
+            ).order_by('agent').values( 'hold','un_hold','non_voice','calls','calls1' ,'inside','dte','talk_time','queue','agent' )
         )
-    print(queryset.query)
+    # response = {
+    #     'callSetData': list(queryset.values()),
+    # }
+    # return JsonResponse(response)
+    agentQueueLogins = {}  
+    queue_mapping = {}  
+    for skill in skills:
+        queue_mapping[skill] = {skill}
+      
+    if queryset:
+        for callData in queryset:
+            member_dict = callData['agent'].replace("Agent/", "")
+            date = callData['dte']
+            db_queue = callData['queue']
+            
+            for queueLoop in queue_mapping.get(db_queue, []):
+                if group_on_date:
+                    # Ensure the nested dictionaries exist
+                    if queueLoop not in agentQueueLogins:
+                        agentQueueLogins[queueLoop] = {}
+                    if member_dict not in agentQueueLogins[queueLoop]:
+                        agentQueueLogins[queueLoop][member_dict] = {}
+                    if date not in agentQueueLogins[queueLoop][member_dict]:
+                        agentQueueLogins[queueLoop][member_dict][date] = {
+                            'calls': 0.0,
+                            'inside': 0,
+                            'talk_time': 0,
+                            'hold': 0,
+                            'un_hold': 0
+                        }
+                        # Update the values
+                        agentQueueLogins[queueLoop][member_dict][date]['calls'] += callData['calls'] or 0
+                        agentQueueLogins[queueLoop][member_dict][date]['inside'] += callData['inside'] or 0
+                        agentQueueLogins[queueLoop][member_dict][date]['talk_time'] += callData['talk_time'] or 0
+                        agentQueueLogins[queueLoop][member_dict][date]['hold'] += callData['hold'] or 0
+                        agentQueueLogins[queueLoop][member_dict][date]['un_hold'] += callData['un_hold'] or 0
 
+                else:
+            
+                    # Ensure the nested dictionaries exist
+                    if queueLoop not in agentQueueLogins:
+                        agentQueueLogins[queueLoop] = {}
+                    if date not in agentQueueLogins[queueLoop]:
+                        agentQueueLogins[queueLoop][member_dict] = {
+                            'calls': 0.0,
+                            'inside': 0,
+                            'talk_time': 0,
+                            'hold': 0,
+                            'un_hold': 0
+                        }
+                        # Update the values
+                        agentQueueLogins[queueLoop][member_dict]['calls'] += callData['calls'] or 0
+                        agentQueueLogins[queueLoop][member_dict]['inside'] += callData['inside'] or 0
+                        agentQueueLogins[queueLoop][member_dict]['talk_time'] += callData['talk_time'] or 0
+                        agentQueueLogins[queueLoop][member_dict]['hold'] += callData['hold'] or 0
+                        agentQueueLogins[queueLoop][member_dict]['un_hold'] += callData['un_hold'] or 0
+                    
     response = {
-        'getCallStatResult': list(queryset.values()),
+        'callSetData': agentQueueLogins,
     }
     return JsonResponse(response)
 
@@ -239,8 +294,7 @@ def getAgentLoginsAndBreaksData(startDate,endDate,skills,group_by,group_on_date)
     agentBreaksResponse = getAgentBreak(startDate,endDate,skills,group_by,group_on_date , agent_logins )
     agentBreaksResult = json.loads(agentBreaksResponse.content)
     response = {
-        # 'agent_logins': agent_logins,
-        'agentBreaks': agentBreaksResult,
+        'agentLoginBreakData': agentBreaksResult,
     }
     return JsonResponse(response)
         

@@ -25,7 +25,6 @@ class ManualCallsReportView(APIView):
         dial_status = request.GET.get('dial_status') 
         page_number = int(request.GET.get('page_number', 1)) 
         page_size = int(request.GET.get('page_size', 10))  
-        offset = (page_number - 1) * page_size
 
         start_date = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
         end_date = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
@@ -38,10 +37,14 @@ class ManualCallsReportView(APIView):
         if start_date >= end_date:
             return JsonResponse({"error": "start_date must be earlier than end_date."}, status=400)
 
+        selectedQueue = request.GET.getlist('queue')
+        # Validation: Ensure at least one item is selected
+        if not selectedQueue:
+            return JsonResponse({'error': 'At least one Queue/Skill must be selected'}, status=400)
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
         data = json.loads(virtualQueues.content)
-        print(f"Campaigns: {data['campaigns']}")
+        #print(f"Campaigns: {data['campaigns']}")
         ## end get VQ 
 
         if not data['campaigns'] or data['client_id'] is None: # Corrected condition
@@ -130,9 +133,9 @@ def get_campaigns(request):
     )
 
     # Additional filter if 'queue' is provided and not 'all'
-    queue = request.GET.get('queue', '')
-    if queue != 'all' and queue != '':
-        res_campaigns_query = res_campaigns_query.filter(virtual_queue=queue)
+    queue =request.GET.getlist('queue')
+    if not any(str(item).lower() == 'all' for item in queue) and queue:
+        res_campaigns_query = res_campaigns_query.filter(virtual_queue__in=queue)
 
     # Convert query results into an array
     campaigns = [res_campaign.queue for res_campaign in res_campaigns_query]

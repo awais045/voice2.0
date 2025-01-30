@@ -33,6 +33,11 @@ class RegisterIVRDropView(APIView):
         if start_date >= end_date:
             return JsonResponse({"error": "start_date must be earlier than end_date."}, status=400)
 
+        selectedQueue = request.GET.getlist('queue')
+        # Validation: Ensure at least one item is selected
+        if not selectedQueue:
+            return JsonResponse({'error': 'At least one Queue/Skill must be selected'}, status=400)
+        
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
         data = json.loads(virtualQueues.content)
@@ -93,13 +98,9 @@ class RegisterIVRDropView(APIView):
 class IVRDropCallsGraphView(APIView):
     def get(self, request):
         no_of_intervals = []
-        QRY = []  # Use a list to build the query parts
-
         no_of_interval = int(request.GET.get('no_of_interval', 0)) #Get no_of_interval from request
         interval = int(request.GET.get('interval', 0)) #Get interval from request
-        campaign_str = request.GET.get('campaign')
-        campaign = campaign_str.split(',') if campaign_str else []
-
+        
         start_date = request.GET.get('start_date') 
         end_date = request.GET.get('end_date') 
         start_date = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
@@ -196,10 +197,10 @@ def get_campaigns(request):
         active='Y'
     )
 
-    # Additional filter if 'queue' is provided and not 'all'
-    queue = request.GET.get('queue', '')
-    if queue != 'all' and queue != '':
-        res_campaigns_query = res_campaigns_query.filter(virtual_queue=queue)
+  # Additional filter if 'queue' is provided and not 'all'
+    queue =request.GET.getlist('queue')
+    if not any(str(item).lower() == 'all' for item in queue) and queue:
+        res_campaigns_query = res_campaigns_query.filter(virtual_queue__in=queue)
 
     # Convert query results into an array
     campaigns = [res_campaign.queue for res_campaign in res_campaigns_query]
