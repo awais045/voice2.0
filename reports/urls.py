@@ -12,11 +12,17 @@ from .campaign_summary_report import CampaignSummaryReportView
 from .client_campaigns import ClientCampaignView
 from .lead_fetch_report import FetchLeadsReportView
 
+from django.utils.decorators import decorator_from_middleware
+from TeamCollab.middleware import JWTAuthenticationMiddleware
+
+jwt_auth_middleware = decorator_from_middleware(JWTAuthenticationMiddleware)
+
 router = DefaultRouter()
 router.register(r'agent_login', RegisterAgentLoginsView, basename='agent_login')
 
 urlpatterns = [
     # path('', include(router.urls)),
+    path('client_campaigns/', ClientCampaignView.as_view(), name='client_campaigns'),
     path('agent_logins/', AgentLoginsView.as_view(), name='agent_logins'),
     path('agent_login_logout/', AgentLoginsView.as_view(), name='agent_logins'),
     path('ivrdrop_report/', RegisterIVRDropView.as_view(), name='ivrdrop_report'),
@@ -30,6 +36,5 @@ urlpatterns = [
     path('callcenterRecordingsEvaluationSave/', CallsRecordingsEvaluationView.as_view(), name='callcenterRecordingsEvaluationSave'),
     path('manual_campaign_report/', ManualCampaignReportView.as_view(), name='manual_campaign_report'),
     path('campaign_summary_report/', CampaignSummaryReportView.as_view(), name='campaign_summary_report'),
-    path('client_campaigns/', ClientCampaignView.as_view(), name='client_campaigns'),
     path('lead_fetch_report/', FetchLeadsReportView.as_view(), name='lead_fetch_report'),
 ]
