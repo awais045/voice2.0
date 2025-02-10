@@ -5,7 +5,7 @@ from .ivr_drop import RegisterIVRDropView ,IVRDropCallsGraphView
 from .unanswered_calls_report import UnAnsweredCallsView ,UnAnsweredCallsGraphView 
 from .manual_calls_report import ManualCallsReportView
 from .lead_report import LeadsReportView
-from .call_recording_report import CallsRecordingsView
+from .call_recording_report import CallsRecordingsView ,PlayCallRecordingView
 from .call_recording_evaluation import CallsRecordingsEvaluationView
 from .manual_campaign_report import ManualCampaignReportView
 from .campaign_summary_report import CampaignSummaryReportView
@@ -32,6 +32,7 @@ urlpatterns = [
     path('manual_calls_report/', ManualCallsReportView.as_view(), name='manual_calls_report'), 
     path('leads_report/', LeadsReportView.as_view(), name='leads_report'), 
     path('callcenter_recordings/', CallsRecordingsView.as_view(), name='callcenter_recordings'), 
+    path('callcenter_recordings/play_call_recording', PlayCallRecordingView.as_view(), name='play_call_recording'), 
     path('callcenter_recordings_evaluation/', CallsRecordingsView.as_view(), name='callcenter_recordings_evaluation'), 
     path('callcenterRecordingsEvaluationSave/', CallsRecordingsEvaluationView.as_view(), name='callcenterRecordingsEvaluationSave'),
     path('manual_campaign_report/', ManualCampaignReportView.as_view(), name='manual_campaign_report'),

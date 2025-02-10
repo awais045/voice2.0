@@ -568,7 +568,8 @@ class AgentCallLog(models.Model):
     evaluated_by = models.IntegerField(null=True, blank=True)
     evaluation_time = models.PositiveIntegerField(null=True, blank=True) # Use PositiveIntegerField
     is_evaluated = models.BooleanField(default=False) # Use BooleanField
-    comments = models.TextField(null=True, blank=True)
+    transcript = models.TextField(null=True, blank=True)
+    is_transcribed = models.BooleanField(null=True, blank=True)  # tinyint(1) becomes BooleanField
 
     class Meta:
         db_table = 'agent_call_log'  
@@ -642,3 +643,18 @@ class CampaignShowDisposition(models.Model):
             models.Index(fields=['Campaign_id'], name='idx_campaign'),
             models.Index(fields=['status'], name='status'),
         ]
+        
+class ClientCampaign(models.Model):
+    YES_NO_CHOICES = [
+        ('Y', 'Yes'),
+        ('N', 'No')
+    ]
+    
+    client_id = models.IntegerField(null=True, db_index=True)
+    campaign_name = models.CharField(max_length=250, null=True, db_index=True)
+    campaign_type = models.CharField(max_length=64, null=True)
+    active = models.CharField(max_length=1, choices=YES_NO_CHOICES, null=True)
+    show_voip = models.CharField(max_length=1, choices=YES_NO_CHOICES, default='Y')
+
+    class Meta:
+        db_table = 'client_campaigns'

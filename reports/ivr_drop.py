@@ -69,6 +69,7 @@ class RegisterIVRDropView(APIView):
                 'phone', 'time_id','call_date', 'duration', 'queue', 'status','call_duration','duration'
             ).order_by('time_id')
 
+            
             # Apply pagination
             paginator = Paginator(queryset, page_size)  # `page_size` is the number of items per page
             page_obj = paginator.get_page(page_number)  # `page_number` is the current page number
@@ -196,8 +197,7 @@ def get_campaigns(request):
         client=request.GET.get('clients'),
         active='Y'
     )
-
-  # Additional filter if 'queue' is provided and not 'all'
+    # Additional filter if 'queue' is provided and not 'all'
     queue =request.GET.getlist('queue')
     if not any(str(item).lower() == 'all' for item in queue) and queue:
         res_campaigns_query = res_campaigns_query.filter(virtual_queue__in=queue)

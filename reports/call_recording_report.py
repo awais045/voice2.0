@@ -1,5 +1,5 @@
 from rest_framework.response import Response
-from .models import ccmCampaigns ,CampaignField ,LeadIn ,VirtualQueue ,AgentCallLog,ManualCallsRecording
+from .models import ccmCampaigns ,CampaignField ,LeadIn ,VirtualQueue ,AgentCallLog,ManualCallsRecording,ClientCampaign
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from rest_framework.views import APIView
@@ -12,10 +12,130 @@ from collections import defaultdict
 from django.db import connections
 from .serializers import AgentCallLogSerializer,ManualRecordingLogSerializer
 from django.db.models.functions import Cast 
+import socket
+import os
+import base64
 
 #http://127.0.0.1:8000/api/callcenter_recordings/?start_date=2024-11-01&end_date=2025-01-10&format=json&clients=infoarc&queue=infoarc&call_type=INBOUND&cli=&disposition=&lead_id=&duration=
 #http://127.0.0.1:8000/api/callcenter_recordings/?start_date=2024-08-01&end_date=2025-01-10&format=json&clients=infoarc&queue=infoarc&call_type=MANUAL&cli=&disposition=&lead_id=&duration=&agent=
 
+class PlayCallRecordingView(APIView):
+    def get(self, request):
+        
+        root_path = '/recording/web-LHE/Audio/'
+        
+        client = request.GET.get('clients') # reuired 
+        skill = request.GET.get('queue') #required 
+        caller_id = request.GET.get('caller_id') #required 
+        call_id = request.GET.get('call_id') #required 
+        lead_id = get_int_from_request(request, 'lead_id') 
+        transfer_count = get_int_from_request(request, 'transfer_count') # default =0  
+        call_type = request.GET.get('call_type')  # required 
+        agent = request.GET.get('agent')  # required 
+        allowed_call_types = ['INBOUND', 'MANUAL']
+        if not call_type:  # Check if call_type is empty (None or "")
+            return JsonResponse({'error': 'call_type parameter is required.'}, status=400)
+
+        if call_type.upper() not in allowed_call_types: #case insensitive check
+            return JsonResponse({'error': 'Invalid call_type. Allowed values are INBOUND and MANUAL.'}, status=400)
+
+        ## get VQ for campaigns
+        virtualQueues = get_campaigns(request)
+        data = json.loads(virtualQueues.content)
+        ## end get VQ 
+    
+        if not data['skills'] or data['crm_table'] is None: # Corrected condition
+            return JsonResponse({"error": "No skill or Skill not properly Configured."}, status=404)  
+
+        if not data['form_name'] or data['form_name'] is None:
+            return JsonResponse({"error": "Form Name is Empty."}, status=404)  
+        
+        if not data['client_campaigns_ids'] or data['client_campaigns_ids'] is None:
+            return JsonResponse({"error": "Client Campaign Empty."}, status=404)
+        
+        # Filter and annotate the query
+        queryGetCampaignName = ClientCampaign.objects.filter(
+            id__in=data['client_campaigns_ids'],
+        ).first()
+        campaign = queryGetCampaignName.campaign_name
+        
+        timestamp = float(call_id)
+        month = datetime.fromtimestamp(timestamp).strftime("%m-%Y")
+        dateA = datetime.fromtimestamp(timestamp).strftime("%d-%m-%Y") 
+        dateB = datetime.fromtimestamp(timestamp).strftime("%d-%m-%y")
+        
+        if int(transfer_count) > 0:
+            filename = f"{client}-{skill}-{caller_id}-{dateB}-{call_id}-{transfer_count}.mp3"
+        else:
+            filename = f"{client}-{skill}-{agent}-{caller_id}-{dateB}-{call_id}.mp3"
+
+        file_path = f"{root_path}/{client}/{campaign}/{skill}/{call_type.lower()}/{month}/{dateA}/{filename}"
+
+        if call_type.lower() == 'manual':
+            call_type = 'manual'
+            manual_id = request.GET.get('manual_id') #required 
+
+            campaign_id = data['client_campaigns_ids'][0]
+            if manual_id:
+                filename = f"{agent}-{manual_id}_{caller_id}_{campaign_id}-{call_id}.mp3"
+            else:
+                filename = f"{agent}-{caller_id}-{call_id}.mp3"
+
+            recording = ManualCallsRecording.objects.filter(
+                recording_id=request.GET.get('recording_id')
+            ).first()
+            
+            file_path = recording.filename
+            path_parts = file_path.split('/')
+            
+            if len(path_parts) < 9:
+                slice_index = -5
+                root_path = root_path.replace("Audio/", "")
+            else:
+                slice_index = -7
+                
+            file_path = '/'.join(path_parts[slice_index:]) + '.mp3'
+            final_path = root_path + file_path
+
+            params = {
+                'time': int(datetime.now().timestamp()),
+                'user_agent': request.META.get('HTTP_USER_AGENT'),
+                'remote_ip': socket.gethostbyname(socket.gethostname()),
+                'final_path': final_path
+            }
+            if os.path.exists(final_path):
+                with open(final_path, 'rb') as audio_file:
+                    audio_data = audio_file.read()
+                    audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+            
+                return JsonResponse({
+                    'status': 'success',
+                    'audio_data': audio_base64,
+                    'content_type': 'audio/mpeg'
+                })
+            else:
+                return JsonResponse({'status': 'error', 'message': 'File not found'}, status=404)
+   
+        params = {
+            'time': int(datetime.now().timestamp()),
+            'user_agent': request.META.get('HTTP_USER_AGENT'),
+            'remote_ip': socket.gethostbyname(socket.gethostname()),
+            'file_path': file_path
+        }
+        if os.path.exists(file_path):
+            with open(file_path, 'rb') as audio_file:
+                audio_data = audio_file.read()
+                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+           
+            return JsonResponse({
+                'status': 'success',
+                'audio_data': audio_base64,
+                'content_type': 'audio/mpeg'
+            })
+        else:
+            return JsonResponse({'status': 'error', 'message': 'File not found'}, status=404)
+        
+        
 class CallsRecordingsView(APIView):
     def get(self, request):
         start_date = request.GET.get('start_date') 
