@@ -35,8 +35,8 @@ class RegisterIVRDropView(APIView):
 
         selectedQueue = request.GET.getlist('queue')
         # Validation: Ensure at least one item is selected
-        if not selectedQueue:
-            return JsonResponse({'error': 'At least one Queue/Skill must be selected'}, status=400)
+        # if not selectedQueue:
+        #     return JsonResponse({'error': 'At least one Queue/Skill must be selected'}, status=400)
         
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
@@ -69,6 +69,8 @@ class RegisterIVRDropView(APIView):
                 'phone', 'time_id','call_date', 'duration', 'queue', 'status','call_duration','duration'
             ).order_by('time_id')
 
+            if selectedQueue:
+                queryset = queryset.filter(queue__in=data['campaigns'])
             
             # Apply pagination
             paginator = Paginator(queryset, page_size)  # `page_size` is the number of items per page
@@ -117,7 +119,11 @@ class IVRDropCallsGraphView(APIView):
         if not all([no_of_interval, interval ]):
             return JsonResponse({'error': 'Missing required parameters'}, status=400)
 
-
+        selectedQueue = request.GET.getlist('queue')
+        # Validation: Ensure at least one item is selected
+        # if not selectedQueue:
+        #     return JsonResponse({'error': 'At least one Queue/Skill must be selected'}, status=400)
+        
         ## get VQ for campaigns
         virtualQueues = get_campaigns(request)
         dataCampaigns = json.loads(virtualQueues.content)
@@ -164,6 +170,9 @@ class IVRDropCallsGraphView(APIView):
                 arg2__in=dataCampaigns['client_id'],
             )
 
+            if selectedQueue:
+                queryset = queryset.filter(queue__in=dataCampaigns['campaigns'])
+                
             # # Annotate with conditional sums
             for idx, condition in enumerate(interval_conditions):
                 start, end = interval_start_end[idx]  # Proper unpacking of interval range

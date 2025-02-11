@@ -1,5 +1,5 @@
 from rest_framework.response import Response
-from .models import ccmCampaigns ,CampaignField ,LeadIn ,VirtualQueue ,AgentCallLog,ManualCallsRecording,ClientCampaign
+from .models import ccmCampaigns ,CampaignField ,LeadIn ,VirtualQueue ,AgentCallLog,ManualCallsRecording,ClientCampaign,RecordingTempFile
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from rest_framework.views import APIView
@@ -103,11 +103,26 @@ class PlayCallRecordingView(APIView):
                 'remote_ip': socket.gethostbyname(socket.gethostname()),
                 'final_path': final_path
             }
+            record = RecordingTempFile.objects.create(
+                    mpd_file_path= 'path/to/mpd/file.mpd',
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                    user_id=1,
+                    mpd_file_deleted='N',
+                    skill=skill,
+                    type='Audio',
+                    agent=agent,
+                    caller_id=caller_id,
+                    call_id=call_id,
+                    rec_file_name=json.dumps(params),
+                    enc_pass='securepass',
+                    play_url=''
+                )
             if os.path.exists(final_path):
                 with open(final_path, 'rb') as audio_file:
                     audio_data = audio_file.read()
                     audio_base64 = base64.b64encode(audio_data).decode('utf-8')
-            
+
                 return JsonResponse({
                     'status': 'success',
                     'audio_data': audio_base64,
@@ -122,11 +137,26 @@ class PlayCallRecordingView(APIView):
             'remote_ip': socket.gethostbyname(socket.gethostname()),
             'file_path': file_path
         }
+        record = RecordingTempFile.objects.create(
+                    mpd_file_path= 'path/to/mpd/file.mpd',
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                    user_id=1,
+                    mpd_file_deleted='N',
+                    skill=skill,
+                    type='Audio',
+                    agent=agent,
+                    caller_id=caller_id,
+                    call_id=call_id,
+                    rec_file_name=json.dumps(params),
+                    enc_pass='securepass',
+                    play_url=''
+                )
         if os.path.exists(file_path):
             with open(file_path, 'rb') as audio_file:
                 audio_data = audio_file.read()
                 audio_base64 = base64.b64encode(audio_data).decode('utf-8')
-           
+
             return JsonResponse({
                 'status': 'success',
                 'audio_data': audio_base64,

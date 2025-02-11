@@ -19,13 +19,8 @@ class FetchLeadsReportView(APIView):
     def get(self, request):
         start_date = request.GET.get('start_date') 
         end_date = request.GET.get('end_date') 
-        disposition = request.GET.get('disposition') 
-
-        duration = get_int_from_request(request, 'duration')
+    
         lead_id = get_int_from_request(request, 'lead_id')
-        agent = get_int_from_request(request, 'agent')
-        cli = get_int_from_request(request, 'cli')
-
         page_number = int(request.GET.get('page_number', 1)) 
         page_size = int(request.GET.get('page_size', 10))  
 
@@ -69,24 +64,53 @@ class FetchLeadsReportView(APIView):
         if start_date and end_date:
             start_timestamp = int(datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').timestamp())
             end_timestamp = int(datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').timestamp())
-
-            queryset = AgentLogOutbound.objects.raw("""
-                SELECT a.lead_id, a.time_id, a.manual_id, COUNT(*) AS cnt,
-                    SUM(b.end_epoch - b.start_epoch) AS total_call_duration,
-                    SUM(b.length_in_sec) AS total_talk_time,
-                    date_format(from_unixtime(a.time_id), "%%Y-%%m-%%d %%H:%%i:%%s") as formatted_time_id,
-                    a.user, GROUP_CONCAT(DISTINCT b.extension) AS cli,
-                    b.extension, a.status AS diposition,
-                    GROUP_CONCAT(b.dial_status), b.dial_status,
-                    a.time_spent, b.campaign_name, a.campaign , b.recording_id,a.id
-                FROM agent_log_outbound AS a
-                LEFT JOIN manual_recording_log AS b
-                    ON a.lead_id = b.lead_id AND a.manual_id = b.manual_id
-                WHERE a.time_id BETWEEN %s AND %s
-                    AND a.status NOT LIKE %s AND a.campaign in %s
-                GROUP BY a.manual_id
-                ORDER BY a.id ASC
-            """, [start_timestamp, end_timestamp,   "%lock%", data['skills']])
+            
+            # Fetch the leads based on the agent type
+            agent = request.GET.get('agent' , '')
+            if agent:  # Ensure `agent` is not empty
+                agent_list = agent.split(',')  # Convert to a list
+                agent_list = [int(i) for i in agent_list if i.isdigit()]  # Convert to integers safely
+            
+                if len(agent_list) > 0:  # Check if the list has elements
+                    queryset = AgentLogOutbound.objects.raw("""
+                        SELECT a.lead_id, a.time_id, a.manual_id, COUNT(*) AS cnt,
+                            SUM(b.end_epoch - b.start_epoch) AS total_call_duration,
+                            SUM(b.length_in_sec) AS total_talk_time,
+                            date_format(from_unixtime(a.time_id), "%%Y-%%m-%%d %%H:%%i:%%s") as formatted_time_id,
+                            a.user, GROUP_CONCAT(DISTINCT b.extension) AS cli,
+                            b.extension, a.status AS diposition,
+                            GROUP_CONCAT(b.dial_status), b.dial_status,
+                            a.time_spent, b.campaign_name, a.campaign , b.recording_id,a.id
+                        FROM agent_log_outbound AS a
+                        LEFT JOIN manual_recording_log AS b
+                            ON a.lead_id = b.lead_id AND a.manual_id = b.manual_id
+                        WHERE a.time_id BETWEEN %s AND %s
+                            AND a.status NOT LIKE %s AND a.campaign in %s
+                            AND a.user IN %s
+                        GROUP BY a.manual_id
+                        ORDER BY a.id ASC
+                    """, [start_timestamp, end_timestamp,   "%lock%", data['skills'] , agent_list])
+                else:
+                    return Response({"error": "Plase Send Valid Agent Extension ex: 1002,1003 "}, status=400)
+                    
+            else:
+                queryset = AgentLogOutbound.objects.raw("""
+                    SELECT a.lead_id, a.time_id, a.manual_id, COUNT(*) AS cnt,
+                        SUM(b.end_epoch - b.start_epoch) AS total_call_duration,
+                        SUM(b.length_in_sec) AS total_talk_time,
+                        date_format(from_unixtime(a.time_id), "%%Y-%%m-%%d %%H:%%i:%%s") as formatted_time_id,
+                        a.user, GROUP_CONCAT(DISTINCT b.extension) AS cli,
+                        b.extension, a.status AS diposition,
+                        GROUP_CONCAT(b.dial_status), b.dial_status,
+                        a.time_spent, b.campaign_name, a.campaign , b.recording_id,a.id
+                    FROM agent_log_outbound AS a
+                    LEFT JOIN manual_recording_log AS b
+                        ON a.lead_id = b.lead_id AND a.manual_id = b.manual_id
+                    WHERE a.time_id BETWEEN %s AND %s
+                        AND a.status NOT LIKE %s AND a.campaign in %s
+                    GROUP BY a.manual_id
+                    ORDER BY a.id ASC
+                """, [start_timestamp, end_timestamp,   "%lock%", data['skills']])
            
             # Convert RawQuerySet results into a list of dictionaries manually
             results = [

@@ -658,3 +658,36 @@ class ClientCampaign(models.Model):
 
     class Meta:
         db_table = 'client_campaigns'
+        
+class ClientsRecordingLog(models.Model):
+    recording_id = models.IntegerField(null=True, blank=True)
+    phone_number = models.CharField(max_length=50, null=True, blank=True)
+    lead_id = models.IntegerField(null=True, blank=True)
+    skill = models.CharField(max_length=100, null=True, blank=True)
+    recording_type = models.CharField(max_length=50, null=True, blank=True)
+    created_at = models.IntegerField(null=True, blank=True)
+    created_by = models.IntegerField(null=True, blank=True)
+    action = models.CharField(max_length=100, null=True, blank=True)
+
+    class Meta:
+        db_table = 'clients_recording_logs'
+
+
+class RecordingTempFile(models.Model):
+    id = models.AutoField(primary_key=True)
+    mpd_file_path = models.CharField(max_length=165)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    user_id = models.IntegerField()
+    mpd_file_deleted = models.CharField(max_length=1, choices=[('Y', 'Yes'), ('N', 'No')], default='N')
+    skill = models.CharField(max_length=128)
+    type = models.CharField(max_length=45)
+    agent = models.CharField(max_length=128)
+    caller_id = models.CharField(max_length=128)
+    call_id = models.CharField(max_length=128)
+    rec_file_name = models.TextField()
+    enc_pass = models.CharField(max_length=45)
+    play_url = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'recording_temp_files'
